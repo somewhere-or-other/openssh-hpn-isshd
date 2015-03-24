@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.209 2015/03/11 00:48:39 jsg Exp $ */
+/* $OpenBSD: packet.c,v 1.210 2015/03/24 20:10:08 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1281,10 +1281,8 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	 * Since we are blocking, ensure that all written packets have
 	 * been sent.
 	 */
-	if ((r = ssh_packet_write_wait(ssh)) != 0) {
-		free(setp);
-		return r;
-	}
+	if ((r = ssh_packet_write_wait(ssh)) != 0)
+		goto out;
 
 	/* Stay in the loop until we have received a complete packet. */
 	for (;;) {
