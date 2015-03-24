@@ -1,4 +1,8 @@
+<<<<<<< e9813792f9e7d0ee152ac5600ffd7f46a4466a27
 /* $OpenBSD: ssh-keysign.c,v 1.49 2015/07/03 03:56:25 djm Exp $ */
+=======
+/* $OpenBSD: ssh-keysign.c,v 1.48 2015/03/24 20:09:11 markus Exp $ */
+>>>>>>> upstream commit
 /*
  * Copyright (c) 2002 Markus Friedl.  All rights reserved.
  *
