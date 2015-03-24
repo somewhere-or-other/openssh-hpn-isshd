@@ -140,17 +140,13 @@ else
 fi
 
 AC_ARG_WITH([ssh1],
-	[  --without-ssh1          Enable support for SSH protocol 1],
+	[  --with-ssh1             Enable support for SSH protocol 1],
 	[
 		if test "x$withval" = "xyes" ; then
 			if test "x$openssl" = "xno" ; then
 				AC_MSG_ERROR([Cannot enable SSH protocol 1 with OpenSSL disabled])
 			fi
 			ssh1=yes
-		elif test "x$withval" = "xno" ; then
-			ssh1=no
-		else
-			AC_MSG_ERROR([unknown --with-ssh1 argument])
 		fi
 	]
 )
