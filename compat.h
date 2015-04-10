@@ -1,4 +1,8 @@
+<<<<<<< 9755399996a85fe9e1c4f4f9b00d66ebf82e8037
 /* $OpenBSD: compat.h,v 1.48 2015/05/26 23:23:40 dtucker Exp $ */
+=======
+/* $OpenBSD: compat.h,v 1.47 2015/04/10 05:16:50 dtucker Exp $ */
+>>>>>>> upstream commit
 
 /*
  * Copyright (c) 1999, 2000, 2001 Markus Friedl.  All rights reserved.
@@ -62,7 +66,7 @@
 #define SSH_BUG_CURVE25519PAD	0x10000000
 #define SSH_BUG_HOSTKEYS	0x20000000
 #define SSH_BUG_LARGEWINDOW	0x40000000
-#define SSH_BUG_DHGEX_LARGE	0x80000000
+#define SSH_BUG_LARGEWINDOW	0x80000000
 
 void     enable_compat13(void);
 void     enable_compat20(void);

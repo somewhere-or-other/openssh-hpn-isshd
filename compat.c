@@ -1,4 +1,4 @@
-/* $OpenBSD: compat.c,v 1.88 2015/04/07 23:00:42 djm Exp $ */
+/* $OpenBSD: compat.c,v 1.89 2015/04/10 05:16:50 dtucker Exp $ */
 /*
  * Copyright (c) 1999, 2000, 2001, 2002 Markus Friedl.  All rights reserved.
  *
@@ -190,17 +190,6 @@ compat_datafellows(const char *version)
 		  "TTSSH/2.70*,"
 		  "TTSSH/2.71*,"
 		  "TTSSH/2.72*",	SSH_BUG_HOSTKEYS },
-		{ "WinSCP_release_4*,"
-		  "WinSCP_release_5.0*,"
-		  "WinSCP_release_5.1*,"
-		  "WinSCP_release_5.5*,"
-		  "WinSCP_release_5.6*,"
-		  "WinSCP_release_5.7,"
-		  "WinSCP_release_5.7.1,"
-		  "WinSCP_release_5.7.2,"
-		  "WinSCP_release_5.7.3,"
-		  "WinSCP_release_5.7.4",
-					SSH_OLD_DHGEX },
 		{ NULL,			0 }
 	};
 
