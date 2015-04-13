@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgexc.c,v 1.22 2015/05/26 23:23:40 dtucker Exp $ */
+/* $OpenBSD: kexgexc.c,v 1.21 2015/04/13 02:04:08 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.

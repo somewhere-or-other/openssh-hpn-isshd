@@ -1,4 +1,4 @@
-/* $OpenBSD: compat.c,v 1.89 2015/04/10 05:16:50 dtucker Exp $ */
+/* $OpenBSD: compat.c,v 1.90 2015/04/13 02:04:08 djm Exp $ */
 /*
  * Copyright (c) 1999, 2000, 2001, 2002 Markus Friedl.  All rights reserved.
  *
@@ -177,6 +177,7 @@ compat_datafellows(const char *version)
 		  "PuTTY_Release_0.64*",
 					SSH_OLD_DHGEX },
 		{ "FuTTY*",		SSH_OLD_DHGEX }, /* Putty Fork */
+		{ "PuTTY*",		SSH_OLD_DHGEX },
 		{ "Probe-*",
 					SSH_BUG_PROBE },
 		{ "TeraTerm SSH*,"
