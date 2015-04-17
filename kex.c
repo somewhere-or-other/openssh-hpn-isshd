@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.109 2015/07/30 00:01:34 djm Exp $ */
+/* $OpenBSD: kex.c,v 1.106 2015/04/17 13:25:52 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
