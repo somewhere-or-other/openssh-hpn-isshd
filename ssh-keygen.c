@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.268 2015/03/31 11:06:49 tobias Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.269 2015/04/17 13:19:22 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1201,8 +1201,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 		exit(1);
 	} else if (delete_host && !ctx.found_key) {
 		logit("Host %s not found in %s", name, identity_file);
-		if (inplace)
-			unlink(tmp);
+		unlink(tmp);
 	} else if (inplace) {
 		/* Backup existing file */
 		if (unlink(old) == -1 && errno != ENOENT)
@@ -1385,7 +1384,7 @@ do_change_comment(struct passwd *pw)
 	}
 	/* XXX what about new-format keys? */
 	if (private->type != KEY_RSA1) {
-		fprintf(stderr, "Comments are only supported for RSA1 keys.\n");
+		error("Comments are only supported for RSA1 keys.");
 		explicit_bzero(passphrase, strlen(passphrase));
 		sshkey_free(private);
 		exit(1);
@@ -1574,6 +1573,25 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 	struct sshkey *ca, *public;
 	char *otmp, *tmp, *cp, *out, *comment, **plist = NULL;
 	FILE *f;
+	int v00 = 0; /* legacy keys */
+
+	if (key_type_name != NULL) {
+		switch (sshkey_type_from_name(key_type_name)) {
+		case KEY_RSA_CERT_V00:
+		case KEY_DSA_CERT_V00:
+			v00 = 1;
+			break;
+		case KEY_UNSPEC:
+			if (strcasecmp(key_type_name, "v00") == 0) {
+				v00 = 1;
+				break;
+			} else if (strcasecmp(key_type_name, "v01") == 0)
+				break;
+			/* FALLTHROUGH */
+		default:
+			fatal("unknown key type %s", key_type_name);
+		}
+	}
 
 #ifdef ENABLE_PKCS11
 	pkcs11_init(1);
