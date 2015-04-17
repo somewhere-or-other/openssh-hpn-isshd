@@ -1,5 +1,4 @@
-
-/* $OpenBSD: servconf.c,v 1.280 2015/08/06 14:53:21 deraadt Exp $ */
+/* $OpenBSD: servconf.c,v 1.261 2015/04/17 04:12:35 dtucker Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -2302,7 +2301,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_int(sMaxSessions, o->max_sessions);
 	dump_cfg_int(sClientAliveInterval, o->client_alive_interval);
 	dump_cfg_int(sClientAliveCountMax, o->client_alive_count_max);
-	dump_cfg_oct(sStreamLocalBindMask, o->fwd_opts.streamlocal_bind_mask);
+	dump_cfg_int(sStreamLocalBindMask, o->fwd_opts.streamlocal_bind_mask);
 
 	/* formatted integer arguments */
 	dump_cfg_fmtint(sPermitRootLogin, o->permit_root_login);
