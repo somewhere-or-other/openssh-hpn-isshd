@@ -1,4 +1,4 @@
-/* $OpenBSD: servconf.c,v 1.263 2015/04/23 04:59:10 dtucker Exp $ */
+/* $OpenBSD: servconf.c,v 1.264 2015/04/24 01:36:00 deraadt Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved

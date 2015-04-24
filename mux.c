@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.54 2015/08/19 23:18:26 djm Exp $ */
+/* $OpenBSD: mux.c,v 1.51 2015/04/24 01:36:00 deraadt Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *

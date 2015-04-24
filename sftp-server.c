@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-server.c,v 1.107 2015/08/20 22:32:42 deraadt Exp $ */
+/* $OpenBSD: sftp-server.c,v 1.106 2015/04/24 01:36:01 deraadt Exp $ */
 /*
  * Copyright (c) 2000-2004 Markus Friedl.  All rights reserved.
  *
