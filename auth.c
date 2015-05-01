@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.113 2015/08/21 03:42:19 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.111 2015/05/01 04:17:51 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
