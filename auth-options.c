@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-options.c,v 1.66 2015/04/22 01:24:01 djm Exp $ */
+/* $OpenBSD: auth-options.c,v 1.67 2015/05/01 03:20:54 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
