@@ -1,5 +1,4 @@
-
-/* $OpenBSD: servconf.c,v 1.266 2015/04/29 03:48:56 dtucker Exp $ */
+/* $OpenBSD: servconf.c,v 1.269 2015/05/04 06:10:48 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -806,7 +805,6 @@ match_cfg_line(char **condition, int line, struct connection_info *ci)
 {
 	int result = 1, attributes = 0, port;
 	char *arg, *attrib, *cp = *condition;
-	size_t len;
 
 	if (ci == NULL)
 		debug3("checking syntax for 'Match %s'", cp);
@@ -833,13 +831,12 @@ match_cfg_line(char **condition, int line, struct connection_info *ci)
 			error("Missing Match criteria for %s", attrib);
 			return -1;
 		}
-		len = strlen(arg);
 		if (strcasecmp(attrib, "user") == 0) {
 			if (ci == NULL || ci->user == NULL) {
 				result = 0;
 				continue;
 			}
-			if (match_pattern_list(ci->user, arg, len, 0) != 1)
+			if (match_pattern_list(ci->user, arg, 0) != 1)
 				result = 0;
 			else
 				debug("user %.100s matched 'User %.100s' at "
@@ -860,7 +857,7 @@ match_cfg_line(char **condition, int line, struct connection_info *ci)
 				result = 0;
 				continue;
 			}
-			if (match_hostname(ci->host, arg, len) != 1)
+			if (match_hostname(ci->host, arg) != 1)
 				result = 0;
 			else
 				debug("connection from %.100s matched 'Host "
