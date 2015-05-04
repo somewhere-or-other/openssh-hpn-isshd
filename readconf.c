@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.234 2015/04/24 01:36:00 deraadt Exp $ */
+/* $OpenBSD: readconf.c,v 1.235 2015/05/04 06:10:48 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
