@@ -1,4 +1,4 @@
-/* $OpenBSD: bcrypt_pbkdf.c,v 1.10 2014/12/30 01:41:43 djm Exp $ */
+/* $OpenBSD: bcrypt_pbkdf.c,v 1.12 2015/01/08 00:30:07 deraadt Exp $ */
 /*
  * Copyright (c) 2013 Ted Unangst <tedu@openbsd.org>
  *
