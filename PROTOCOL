@@ -452,4 +452,4 @@ respond with a SSH_FXP_STATUS message.
 This extension is advertised in the SSH_FXP_VERSION hello with version
 "1".
 
-$OpenBSD: PROTOCOL,v 1.29 2015/07/17 03:09:19 djm Exp $
+$OpenBSD: PROTOCOL,v 1.28 2015/05/08 03:56:51 djm Exp $
