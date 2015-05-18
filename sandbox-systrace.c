@@ -1,4 +1,4 @@
-/* $OpenBSD: sandbox-systrace.c,v 1.17 2015/07/27 16:29:23 guenther Exp $ */
+/* $OpenBSD: sandbox-systrace.c,v 1.15 2015/05/18 15:06:05 deraadt Exp $ */
 /*
  * Copyright (c) 2011 Damien Miller <djm@mindrot.org>
  *
