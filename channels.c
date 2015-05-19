@@ -1976,7 +1976,7 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
 
 #ifdef NERSC_MOD
 			/* this section for filtering unwanted data */
-			if ( !c->isatty  && c->audit_enable == 1 ) {
+			if ( !c->wfd_isatty  && c->audit_enable == 1 ) {
 				int print_len = 0;
 
 				/* walk along the client/tx data, chopping it up into
@@ -2800,7 +2800,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	/* monitor ssh server w/ tty on channel end */
 	if (!c->client_tty && c->isatty ) {
 
-		u_char *ptr, *end_ptr;
+		char *ptr, *end_ptr;
 		end_ptr = data + data_len;
 
 		/* If we have skipped data, log it now then reset the whole tx buffer
@@ -3448,7 +3448,7 @@ channel_setup_fwd_listener_tcpip(int type, struct Forward *fwd,
 #ifdef NERSC_MOD
 	char* t1buf = encode_string(host, strlen(host));
 	s_audit("channel_set_fwd_listener_3", "count=%i count=%i count=%i count=%i uristring=%s port=%i/tcp port=%i/tcp", 
-		client_session_id, c->self, type, wildcard, t1buf, fwd->connect_port, fwd->listen_port);
+		client_session_id, c->self, type, wildcard, t1buf, port_to_connect, listen_port);
 
 	free(t1buf);
 #endif
