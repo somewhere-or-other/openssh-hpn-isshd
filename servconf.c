@@ -1,4 +1,4 @@
-/* $OpenBSD: servconf.c,v 1.269 2015/05/04 06:10:48 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.270 2015/05/21 06:43:30 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -163,6 +163,8 @@ initialize_server_options(ServerOptions *options)
 	options->revoked_keys_file = NULL;
 	options->trusted_user_ca_keys = NULL;
 	options->authorized_principals_file = NULL;
+	options->authorized_principals_command = NULL;
+	options->authorized_principals_command_user = NULL;
 	options->none_enabled = -1;
 	options->tcp_rcv_buf_poll = -1;
 	options->hpn_disabled = -1;

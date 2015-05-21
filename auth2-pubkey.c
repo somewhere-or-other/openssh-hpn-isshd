@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.50 2015/05/21 06:38:35 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.51 2015/05/21 06:43:30 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -629,7 +629,7 @@ match_principals_file(char *file, struct passwd *pw, struct sshkey_cert *cert)
  * returns 1 if the principal is allowed or 0 otherwise.
  */
 static int
-match_principals_command(struct passwd *user_pw, struct sshkey_cert *cert)
+match_principals_command(struct passwd *user_pw, struct sshkey *key)
 {
 	FILE *f = NULL;
 	int ok, found_principal = 0;
@@ -694,7 +694,7 @@ match_principals_command(struct passwd *user_pw, struct sshkey_cert *cert)
 	uid_swapped = 1;
 	temporarily_use_uid(pw);
 
-	ok = process_principals(f, NULL, pw, cert);
+	ok = process_principals(f, NULL, pw, key->cert);
 
 	if (exited_cleanly(pid, "AuthorizedPrincipalsCommand", command) != 0)
 		goto out;
@@ -848,7 +848,11 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 {
 	char *ca_fp, *principals_file = NULL;
 	const char *reason;
+<<<<<<< ce09c00bd21a4303a2925048c43baf4b4a5dc4d0
 	int ret = 0, found_principal = 0, use_authorized_principals;
+=======
+	int ret = 0, found_principal = 0;
+>>>>>>> upstream commit
 
 	if (!key_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
@@ -874,12 +878,20 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 			found_principal = 1;
 	}
 	/* Try querying command if specified */
+<<<<<<< ce09c00bd21a4303a2925048c43baf4b4a5dc4d0
 	if (!found_principal && match_principals_command(pw, key->cert))
 		found_principal = 1;
 	/* If principals file or command is specified, then require a match */
 	use_authorized_principals = principals_file != NULL ||
             options.authorized_principals_command != NULL;
 	if (!found_principal && use_authorized_principals) {
+=======
+	if (!found_principal && match_principals_command(pw, key))
+		found_principal = 1;
+	/* If principals file or command specify, then require a match here */
+	if (!found_principal && (principals_file != NULL ||
+	    options.authorized_principals_command != NULL)) {
+>>>>>>> upstream commit
 		reason = "Certificate does not contain an authorized principal";
  fail_reason:
 		error("%s", reason);

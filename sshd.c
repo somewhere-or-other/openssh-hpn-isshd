@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.448 2015/04/27 00:21:21 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.449 2015/05/21 06:43:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
