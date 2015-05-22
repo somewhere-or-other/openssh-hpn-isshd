@@ -1,4 +1,4 @@
-/* $OpenBSD: servconf.h,v 1.118 2015/05/21 06:43:31 djm Exp $ */
+/* $OpenBSD: servconf.h,v 1.119 2015/05/22 03:50:02 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
