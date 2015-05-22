@@ -848,11 +848,7 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 {
 	char *ca_fp, *principals_file = NULL;
 	const char *reason;
-<<<<<<< ce09c00bd21a4303a2925048c43baf4b4a5dc4d0
-	int ret = 0, found_principal = 0, use_authorized_principals;
-=======
 	int ret = 0, found_principal = 0;
->>>>>>> upstream commit
 
 	if (!key_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
@@ -878,20 +874,12 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 			found_principal = 1;
 	}
 	/* Try querying command if specified */
-<<<<<<< ce09c00bd21a4303a2925048c43baf4b4a5dc4d0
 	if (!found_principal && match_principals_command(pw, key->cert))
 		found_principal = 1;
 	/* If principals file or command is specified, then require a match */
 	use_authorized_principals = principals_file != NULL ||
             options.authorized_principals_command != NULL;
 	if (!found_principal && use_authorized_principals) {
-=======
-	if (!found_principal && match_principals_command(pw, key))
-		found_principal = 1;
-	/* If principals file or command specify, then require a match here */
-	if (!found_principal && (principals_file != NULL ||
-	    options.authorized_principals_command != NULL)) {
->>>>>>> upstream commit
 		reason = "Certificate does not contain an authorized principal";
  fail_reason:
 		error("%s", reason);
