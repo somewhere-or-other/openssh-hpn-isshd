@@ -1,4 +1,4 @@
-/* $OpenBSD: dh.c,v 1.56 2015/03/26 06:59:28 djm Exp $ */
+/* $OpenBSD: dh.c,v 1.57 2015/05/27 23:39:18 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  *
