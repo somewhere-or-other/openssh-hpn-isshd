@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.261 2015/04/14 04:17:03 dtucker Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.262 2015/05/28 05:41:29 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
