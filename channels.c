@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.343 2015/05/08 03:25:07 dtucker Exp $ */
+/* $OpenBSD: channels.c,v 1.344 2015/06/05 15:13:13 millert Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
