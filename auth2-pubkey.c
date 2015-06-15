@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.51 2015/05/21 06:43:30 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.52 2015/06/15 18:42:19 jsing Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -629,7 +629,7 @@ match_principals_file(char *file, struct passwd *pw, struct sshkey_cert *cert)
  * returns 1 if the principal is allowed or 0 otherwise.
  */
 static int
-match_principals_command(struct passwd *user_pw, struct sshkey *key)
+match_principals_command(struct passwd *user_pw, struct sshkey_cert *cert)
 {
 	FILE *f = NULL;
 	int ok, found_principal = 0;
@@ -694,7 +694,7 @@ match_principals_command(struct passwd *user_pw, struct sshkey *key)
 	uid_swapped = 1;
 	temporarily_use_uid(pw);
 
-	ok = process_principals(f, NULL, pw, key->cert);
+	ok = process_principals(f, NULL, pw, cert);
 
 	if (exited_cleanly(pid, "AuthorizedPrincipalsCommand", command) != 0)
 		goto out;
