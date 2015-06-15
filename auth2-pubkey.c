@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.52 2015/06/15 18:42:19 jsing Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.53 2015/06/15 18:44:22 jsing Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -848,7 +848,7 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 {
 	char *ca_fp, *principals_file = NULL;
 	const char *reason;
-	int ret = 0, found_principal = 0;
+	int ret = 0, found_principal = 0, use_authorized_principals;
 
 	if (!key_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
