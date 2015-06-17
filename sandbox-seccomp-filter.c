@@ -81,7 +81,7 @@
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, __NR_ ## _nr, 0, 1), \
 	BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
 #define SC_ALLOW_ARG(_nr, _arg_nr, _arg_val) \
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, __NR_ ## _nr, 0, 4), \
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, __NR_ ## _nr, 0, 3), \
 	/* load first syscall argument */ \
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, \
 	    offsetof(struct seccomp_data, args[(_arg_nr)])), \
@@ -142,12 +142,6 @@ static const struct sock_filter preauth_insns[] = {
 #ifdef __NR_socketcall
 	SC_ALLOW(socketcall),
 #endif
-	SC_ALLOW(brk),
-	SC_ALLOW(poll),
-#ifdef __NR__newselect
-	SC_ALLOW(_newselect),
-#else
-	SC_ALLOW(select),
 #ifdef __NR_exit
 	SC_ALLOW(exit),
 #endif
