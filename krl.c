@@ -15,7 +15,7 @@
  */
 
 /* $OpenBSD: krl.c,v 1.33 2015/07/03 03:43:18 djm Exp $ */
-
+ 
 #include "includes.h"
 
 #include <sys/param.h>	/* MIN */
