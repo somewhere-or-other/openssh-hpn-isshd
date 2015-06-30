@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.344 2015/06/05 15:13:13 millert Exp $ */
+/* $OpenBSD: channels.c,v 1.345 2015/06/30 05:23:25 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -2310,8 +2310,8 @@ channel_output_poll(void)
 					packet_start(SSH2_MSG_CHANNEL_DATA);
 					packet_put_int(c->remote_id);
 					packet_put_string(data, dlen);
-					packet_length = packet_send();
-					c->remote_window -= dlen + 4;
+					packet_send();
+					c->remote_window -= dlen;
 					free(data);
 				}
 				continue;
