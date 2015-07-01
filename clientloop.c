@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.273 2015/05/04 06:10:48 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.274 2015/07/01 02:26:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
