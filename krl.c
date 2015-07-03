@@ -15,7 +15,11 @@
  */
 
 /* $OpenBSD: krl.c,v 1.33 2015/07/03 03:43:18 djm Exp $ */
+<<<<<<< 970f3d502c25eea979c159833282e9d02661b4f5
  
+=======
+
+>>>>>>> upstream commit
 #include "includes.h"
 
 #include <sys/param.h>	/* MIN */

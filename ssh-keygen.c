@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.274 2015/05/28 07:37:31 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.275 2015/07/03 03:43:18 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1573,25 +1573,6 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 	struct sshkey *ca, *public;
 	char *otmp, *tmp, *cp, *out, *comment, **plist = NULL;
 	FILE *f;
-	int v00 = 0; /* legacy keys */
-
-	if (key_type_name != NULL) {
-		switch (sshkey_type_from_name(key_type_name)) {
-		case KEY_RSA_CERT_V00:
-		case KEY_DSA_CERT_V00:
-			v00 = 1;
-			break;
-		case KEY_UNSPEC:
-			if (strcasecmp(key_type_name, "v00") == 0) {
-				v00 = 1;
-				break;
-			} else if (strcasecmp(key_type_name, "v01") == 0)
-				break;
-			/* FALLTHROUGH */
-		default:
-			fatal("unknown key type %s", key_type_name);
-		}
-	}
 
 #ifdef ENABLE_PKCS11
 	pkcs11_init(1);
