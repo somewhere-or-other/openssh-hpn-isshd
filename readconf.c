@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.237 2015/06/26 05:13:20 djm Exp $ */
+/* $OpenBSD: readconf.c,v 1.238 2015/07/10 06:21:53 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1174,7 +1174,7 @@ parse_keytypes:
 		if (!arg || *arg == '\0')
 			fatal("%.200s line %d: Missing argument.",
 			    filename, linenum);
-		if (!sshkey_names_valid2(*arg == '+' ? arg + 1 : arg, 1))
+		if (!sshkey_names_valid2(arg, 1))
 			fatal("%s line %d: Bad key types '%s'.",
 				filename, linenum, arg ? arg : "<NONE>");
 		if (*activep && *charptr == NULL)
@@ -1946,6 +1946,10 @@ fill_default_options(Options * options)
 	    kex_assemble_names(KEX_DEFAULT_PK_ALG,
 	    &options->pubkey_key_types) != 0)
 		fatal("%s: kex_assemble_names failed", __func__);
+	if (options->hostbased_key_types == NULL)
+		options->hostbased_key_types = xstrdup(KEX_DEFAULT_PK_ALG);
+	if (options->pubkey_key_types == NULL)
+		options->pubkey_key_types = xstrdup(KEX_DEFAULT_PK_ALG);
 
 #define CLEAR_ON_NONE(v) \
 	do { \
