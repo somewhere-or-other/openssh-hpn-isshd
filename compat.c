@@ -1,4 +1,4 @@
-/* $OpenBSD: compat.c,v 1.94 2015/05/26 23:23:40 dtucker Exp $ */
+/* $OpenBSD: compat.c,v 1.95 2015/07/13 04:57:14 dtucker Exp $ */
 /*
  * Copyright (c) 1999, 2000, 2001, 2002 Markus Friedl.  All rights reserved.
  *
