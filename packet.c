@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.212 2015/05/01 07:10:01 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.213 2015/07/29 04:43:06 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1945,8 +1945,6 @@ sshpkt_fatal(struct ssh *ssh, const char *tag, int r)
 			    ssh_err(r), ssh->kex->failed_choice);
 		}
 		/* FALLTHROUGH */
-=======
->>>>>>> upstream commit
 	default:
 		fatal("%s%sConnection to %.200s: %s",
 		    tag != NULL ? tag : "", tag != NULL ? ": " : "",

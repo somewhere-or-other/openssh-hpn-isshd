@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.106 2015/04/17 13:25:52 djm Exp $ */
+/* $OpenBSD: kex.c,v 1.107 2015/07/29 04:43:06 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -719,13 +719,6 @@ kex_choose_conf(struct ssh *ssh)
 			kex->failed_choice = peer[ncomp];
 			peer[ncomp] = NULL;
 			goto out;
-		debug("REQUESTED ENC.NAME is '%s'", newkeys->enc.name);
-		if (strcmp(newkeys->enc.name, "none") == 0) {
-			debug("Requesting NONE. Authflag is %d", auth_flag);
-			if (auth_flag == 1)
-				debug("None requested post authentication.");
-			else
-				fatal("Pre-authentication none cipher requests are not allowed.");
 		}
 		debug("kex: %s %s %s %s",
 		    ctos ? "client->server" : "server->client",
@@ -785,8 +778,8 @@ kex_choose_conf(struct ssh *ssh)
 	}
 	if ((r = choose_hostkeyalg(kex, cprop[PROPOSAL_SERVER_HOST_KEY_ALGS],
 	    sprop[PROPOSAL_SERVER_HOST_KEY_ALGS])) != 0) {
-		kex->failed_choice = peer[PROPOSAL_SERVER_HOST_KEY_ALGS];
-		peer[PROPOSAL_SERVER_HOST_KEY_ALGS] = NULL;
+		kex->failed_choice = cprop[PROPOSAL_SERVER_HOST_KEY_ALGS];
+		cprop[PROPOSAL_SERVER_HOST_KEY_ALGS] = NULL;
 		goto out;
 	}
 	need = dh_need = 0;
