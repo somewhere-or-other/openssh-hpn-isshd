@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.456 2015/07/17 02:47:45 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.457 2015/07/30 00:01:34 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -2687,9 +2687,11 @@ do_ssh2_kex(void)
 	struct kex *kex;
 	int r;
 
-	if (options.none_enabled == 1)
-		debug("WARNING: None cipher enabled");
-
+	if (options.none_enabled == 1) {
+		debug ("WARNING: None cipher enabled");
+		myproposal[PROPOSAL_ENC_ALGS_CTOS] =
+		    myproposal[PROPOSAL_ENC_ALGS_STOC] = KEX_ENCRYPT_INCLUDE_NONE;
+	}
 	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
 	    options.kex_algorithms);
 	myproposal[PROPOSAL_ENC_ALGS_CTOS] = compat_cipher_proposal(

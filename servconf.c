@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.276 2015/07/10 06:21:53 markus Exp $ */
+/* $OpenBSD: servconf.c,v 1.277 2015/07/30 00:01:34 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -271,16 +271,12 @@ fill_default_server_options(ServerOptions *options)
 		options->hostbased_authentication = 0;
 	if (options->hostbased_uses_name_from_packet_only == -1)
 		options->hostbased_uses_name_from_packet_only = 0;
-	if (options->hostbased_key_types == NULL)
-		options->hostbased_key_types = xstrdup(KEX_DEFAULT_PK_ALG);
 	if (options->hostkeyalgorithms == NULL)
 		options->hostkeyalgorithms = xstrdup(KEX_DEFAULT_PK_ALG);
 	if (options->rsa_authentication == -1)
 		options->rsa_authentication = 1;
 	if (options->pubkey_authentication == -1)
 		options->pubkey_authentication = 1;
-	if (options->pubkey_key_types == NULL)
-		options->pubkey_key_types = xstrdup(KEX_DEFAULT_PK_ALG);
 	if (options->kerberos_authentication == -1)
 		options->kerberos_authentication = 0;
 	if (options->kerberos_or_local_passwd == -1)
