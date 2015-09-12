@@ -740,7 +740,7 @@ kex_choose_conf(struct ssh *ssh)
 
 			/* t4buf is not derived from authlen directly, but in  */
 			/*  the event that that value is borked, play it safe  */
-			/*  and bail on this as well cause paranoid ...        */
+			/*  and bail on this as well cause paranoid ....       */
                         char* t4buf = ((authlen != 0 || !kex->client_version_string) ? (encode_string(def_vers_string, sizeof(def_vers_string)-1)) : (encode_string(kex->client_version_string, strlen(kex->client_version_string))));
 
 			s_audit("session_key_exchange", "count=%i uristring=%s_%s_%s_%s",
