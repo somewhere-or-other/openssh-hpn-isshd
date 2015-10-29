@@ -1985,9 +1985,6 @@ ssh_session2_open(void)
 	if (!isatty(err))
 		set_nonblock(err);
 
-	hpn_options_init();
-
->>>>>>> pull the hpn init code out into a dedicated func
 	window = options.hpn_buffer_size;
 
 	packetmax = CHAN_SES_PACKET_DEFAULT;
