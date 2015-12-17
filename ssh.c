@@ -1814,35 +1814,9 @@ ssh_session2_setup(int id, int success, void *arg)
 	    NULL, fileno(stdin), &command, environ);
 }
 
-/* open new channel for a session */
-static int
-ssh_session2_open(void)
+static void
+hpn_options_init(void)
 {
-	Channel *c;
-	int window, packetmax, in, out, err;
-	int sock;
-	int socksize;
-	int socksizelen = sizeof(int);
-
-	if (stdin_null_flag) {
-		in = open(_PATH_DEVNULL, O_RDONLY);
-	} else {
-		in = dup(STDIN_FILENO);
-	}
-	out = dup(STDOUT_FILENO);
-	err = dup(STDERR_FILENO);
-
-	if (in < 0 || out < 0 || err < 0)
-		fatal("dup() in/out/err failed");
-
-	/* enable nonblocking unless tty */
-	if (!isatty(in))
-		set_nonblock(in);
-	if (!isatty(out))
-		set_nonblock(out);
-	if (!isatty(err))
-		set_nonblock(err);
-
 	/*
 	 * We need to check to see if what they want to do about buffer
 	 * sizes here. In a hpn to nonhpn connection we want to limit
@@ -1864,13 +1838,16 @@ ssh_session2_open(void)
 	if (tty_flag)
 		options.hpn_buffer_size = CHAN_SES_WINDOW_DEFAULT;
 	else
-		options.hpn_buffer_size = 2*1024*1024;
+		options.hpn_buffer_size = 2 * 1024 * 1024;
 
 	if (datafellows & SSH_BUG_LARGEWINDOW) {
 		debug("HPN to Non-HPN Connection");
 	} else {
+		int sock, socksize;
+		socklen_t socksizelen;
 		if (options.tcp_rcv_buf_poll <= 0) {
 			sock = socket(AF_INET, SOCK_STREAM, 0);
+			socksizelen = sizeof(socksize);
 			getsockopt(sock, SOL_SOCKET, SO_RCVBUF,
 				   &socksize, &socksizelen);
 			close(sock);
@@ -1888,9 +1865,12 @@ ssh_session2_open(void)
 				 * If they are using the tcp_rcv_buf option,
 				 * attempt to set the buffer size to that.
 				 */
-				if (options.tcp_rcv_buf)
-					setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (void *)&options.tcp_rcv_buf,
-						   sizeof(options.tcp_rcv_buf));
+				if (options.tcp_rcv_buf) {
+					socksizelen = sizeof(options.tcp_rcv_buf);
+					setsockopt(sock, SOL_SOCKET, SO_RCVBUF,
+						   &options.tcp_rcv_buf, socksizelen);
+				}
+				socksizelen = sizeof(socksize);
 				getsockopt(sock, SOL_SOCKET, SO_RCVBUF,
 					   &socksize, &socksizelen);
 				close(sock);
@@ -1903,9 +1883,36 @@ ssh_session2_open(void)
 
 	debug("Final hpn_buffer_size = %d", options.hpn_buffer_size);
 
-	window = options.hpn_buffer_size;
-
 	channel_set_hpn(options.hpn_disabled, options.hpn_buffer_size);
+}
+
+/* open new channel for a session */
+static int
+ssh_session2_open(void)
+{
+	Channel *c;
+	int window, packetmax, in, out, err;
+
+	if (stdin_null_flag) {
+		in = open(_PATH_DEVNULL, O_RDONLY);
+	} else {
+		in = dup(STDIN_FILENO);
+	}
+	out = dup(STDOUT_FILENO);
+	err = dup(STDERR_FILENO);
+
+	if (in < 0 || out < 0 || err < 0)
+		fatal("dup() in/out/err failed");
+
+	/* enable nonblocking unless tty */
+	if (!isatty(in))
+		set_nonblock(in);
+	if (!isatty(out))
+		set_nonblock(out);
+	if (!isatty(err))
+		set_nonblock(err);
+
+	window = options.hpn_buffer_size;
 
 	packetmax = CHAN_SES_PACKET_DEFAULT;
 	if (tty_flag) {
@@ -1936,6 +1943,13 @@ static int
 ssh_session2(void)
 {
 	int id = -1;
+
+	/*
+	 * We need to initialize this early because the forwarding logic below
+	 * might open channels that use the hpn buffer sizes.  We can't send a
+	 * window of -1 (the default) to the server as it breaks things.
+	 */
+	hpn_options_init();
 
 	/* XXX should be pre-session */
 	if (!options.control_persist)
