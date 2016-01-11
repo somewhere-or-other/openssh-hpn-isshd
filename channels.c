@@ -2800,7 +2800,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	/* monitor ssh server w/ tty on channel end */
 	if (!c->client_tty && c->isatty ) {
 
-		char *ptr, *end_ptr;
+		u_char *ptr, *end_ptr;
 		end_ptr = data + data_len;
 
 		/* If we have skipped data, log it now then reset the whole tx buffer
