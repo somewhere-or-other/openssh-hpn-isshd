@@ -142,6 +142,7 @@ extern char n_ntop[NI_MAXHOST];
 extern char n_port[NI_MAXHOST];
 extern int client_session_id;
 extern char interface_list[256];
+extern int audit_disabled = 0;
 #endif
 
 extern char *__progname;
@@ -1828,6 +1829,13 @@ main(int ac, char **av)
 	getnameinfo(options.listen_addrs->ai_addr, options.listen_addrs->ai_addrlen,
 		n_ntop, sizeof(n_ntop), n_port,sizeof(n_port),
 		NI_NUMERICHOST|NI_NUMERICSERV); 
+
+	/* To avoid linking issues, we just set a variable here based on the running configuration
+	 *   not my favorite
+	 */
+	if ( options.audit_disabled )
+		audit_disabled = 1;
+
 #endif
 
 	debug("sshd version %s, %s", SSH_VERSION,
