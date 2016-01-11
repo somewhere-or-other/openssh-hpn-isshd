@@ -135,6 +135,7 @@
 #include <syslog.h>
 
 #include "openbsd-compat/sys-queue.h"
+#include "ssh.h"
 #include "channels.h"
 #include "log.h"
 #include "misc.h"

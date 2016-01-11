@@ -180,6 +180,8 @@ typedef struct {
 
 	int	audit_disabled;		/* disable SSHD instrumentation */
 
+	int	audit_disabled;		/* disable SSHD instrumentation */
+
 	int	permit_tun;
 
 	int	num_permitted_opens;
