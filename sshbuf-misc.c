@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshbuf-misc.c,v 1.4 2015/03/24 20:03:44 markus Exp $	*/
+/*	$OpenBSD: sshbuf-misc.c,v 1.5 2015/10/05 17:11:21 djm Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller
  *

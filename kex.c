@@ -720,6 +720,14 @@ kex_choose_conf(struct ssh *ssh)
 			peer[ncomp] = NULL;
 			goto out;
 		}
+		debug("REQUESTED ENC.NAME is '%s'", newkeys->enc.name);
+		if (strcmp(newkeys->enc.name, "none") == 0) {
+			debug("Requesting NONE. Authflag is %d", auth_flag);
+			if (auth_flag == 1)
+				debug("None requested post authentication.");
+			else
+				fatal("Pre-authentication none cipher requests are not allowed.");
+		}
 		debug("kex: %s %s %s %s",
 		    ctos ? "client->server" : "server->client",
 		    newkeys->enc.name,
@@ -752,7 +760,6 @@ kex_choose_conf(struct ssh *ssh)
 			free(t4buf);
 			}
 #endif
-
 		/*
 		 * client starts with ctos = 0 && log flag = 0 and no log.
 		 * 2nd client pass ctos = 1 and flag = 1 so no log.
