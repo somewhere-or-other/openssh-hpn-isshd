@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.c,v 1.15 2015/03/06 01:40:56 djm Exp $ */
+/* $OpenBSD: sshkey.c,v 1.31 2015/12/11 04:21:12 mmcc Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -83,40 +83,39 @@ struct keytype {
 	int type;
 	int nid;
 	int cert;
+	int sigonly;
 };
 static const struct keytype keytypes[] = {
-	{ "ssh-ed25519", "ED25519", KEY_ED25519, 0, 0 },
+	{ "ssh-ed25519", "ED25519", KEY_ED25519, 0, 0, 0 },
 	{ "ssh-ed25519-cert-v01@openssh.com", "ED25519-CERT",
-	    KEY_ED25519_CERT, 0, 1 },
+	    KEY_ED25519_CERT, 0, 1, 0 },
 #ifdef WITH_OPENSSL
-	{ NULL, "RSA1", KEY_RSA1, 0, 0 },
-	{ "ssh-rsa", "RSA", KEY_RSA, 0, 0 },
-	{ "ssh-dss", "DSA", KEY_DSA, 0, 0 },
+	{ NULL, "RSA1", KEY_RSA1, 0, 0, 0 },
+	{ "ssh-rsa", "RSA", KEY_RSA, 0, 0, 0 },
+	{ "rsa-sha2-256", "RSA", KEY_RSA, 0, 0, 1 },
+	{ "rsa-sha2-512", "RSA", KEY_RSA, 0, 0, 1 },
+	{ "ssh-dss", "DSA", KEY_DSA, 0, 0, 0 },
 # ifdef OPENSSL_HAS_ECC
-	{ "ecdsa-sha2-nistp256", "ECDSA", KEY_ECDSA, NID_X9_62_prime256v1, 0 },
-	{ "ecdsa-sha2-nistp384", "ECDSA", KEY_ECDSA, NID_secp384r1, 0 },
+	{ "ecdsa-sha2-nistp256", "ECDSA", KEY_ECDSA, NID_X9_62_prime256v1, 0, 0 },
+	{ "ecdsa-sha2-nistp384", "ECDSA", KEY_ECDSA, NID_secp384r1, 0, 0 },
 #  ifdef OPENSSL_HAS_NISTP521
-	{ "ecdsa-sha2-nistp521", "ECDSA", KEY_ECDSA, NID_secp521r1, 0 },
+	{ "ecdsa-sha2-nistp521", "ECDSA", KEY_ECDSA, NID_secp521r1, 0, 0 },
 #  endif /* OPENSSL_HAS_NISTP521 */
 # endif /* OPENSSL_HAS_ECC */
-	{ "ssh-rsa-cert-v01@openssh.com", "RSA-CERT", KEY_RSA_CERT, 0, 1 },
-	{ "ssh-dss-cert-v01@openssh.com", "DSA-CERT", KEY_DSA_CERT, 0, 1 },
+	{ "ssh-rsa-cert-v01@openssh.com", "RSA-CERT", KEY_RSA_CERT, 0, 1, 0 },
+	{ "ssh-dss-cert-v01@openssh.com", "DSA-CERT", KEY_DSA_CERT, 0, 1, 0 },
 # ifdef OPENSSL_HAS_ECC
 	{ "ecdsa-sha2-nistp256-cert-v01@openssh.com", "ECDSA-CERT",
-	    KEY_ECDSA_CERT, NID_X9_62_prime256v1, 1 },
+	    KEY_ECDSA_CERT, NID_X9_62_prime256v1, 1, 0 },
 	{ "ecdsa-sha2-nistp384-cert-v01@openssh.com", "ECDSA-CERT",
-	    KEY_ECDSA_CERT, NID_secp384r1, 1 },
+	    KEY_ECDSA_CERT, NID_secp384r1, 1, 0 },
 #  ifdef OPENSSL_HAS_NISTP521
 	{ "ecdsa-sha2-nistp521-cert-v01@openssh.com", "ECDSA-CERT",
-	    KEY_ECDSA_CERT, NID_secp521r1, 1 },
+	    KEY_ECDSA_CERT, NID_secp521r1, 1, 0 },
 #  endif /* OPENSSL_HAS_NISTP521 */
 # endif /* OPENSSL_HAS_ECC */
-	{ "ssh-rsa-cert-v00@openssh.com", "RSA-CERT-V00",
-	    KEY_RSA_CERT_V00, 0, 1 },
-	{ "ssh-dss-cert-v00@openssh.com", "DSA-CERT-V00",
-	    KEY_DSA_CERT_V00, 0, 1 },
 #endif /* WITH_OPENSSL */
-	{ NULL, NULL, -1, -1, 0 }
+	{ NULL, NULL, -1, -1, 0, 0 }
 };
 
 const char *
@@ -204,7 +203,7 @@ key_alg_list(int certs_only, int plain_only)
 	const struct keytype *kt;
 
 	for (kt = keytypes; kt->type != -1; kt++) {
-		if (kt->name == NULL)
+		if (kt->name == NULL || kt->sigonly)
 			continue;
 		if ((certs_only && !kt->cert) || (plain_only && kt->cert))
 			continue;
@@ -251,7 +250,7 @@ sshkey_names_valid2(const char *names, int allow_wildcard)
 					if (kt->type == KEY_RSA1)
 						continue;
 					if (match_pattern_list(kt->name,
-					    p, strlen(p), 0) != 0)
+					    p, 0) != 0)
 						break;
 				}
 				if (kt->type != -1)
@@ -272,11 +271,9 @@ sshkey_size(const struct sshkey *k)
 #ifdef WITH_OPENSSL
 	case KEY_RSA1:
 	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		return BN_num_bits(k->rsa->n);
 	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		return BN_num_bits(k->dsa->p);
 	case KEY_ECDSA:
@@ -288,18 +285,6 @@ sshkey_size(const struct sshkey *k)
 		return 256;	/* XXX */
 	}
 	return 0;
-}
-
-int
-sshkey_cert_is_legacy(const struct sshkey *k)
-{
-	switch (k->type) {
-	case KEY_DSA_CERT_V00:
-	case KEY_RSA_CERT_V00:
-		return 1;
-	default:
-		return 0;
-	}
 }
 
 static int
@@ -329,10 +314,8 @@ int
 sshkey_type_plain(int type)
 {
 	switch (type) {
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		return KEY_RSA;
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		return KEY_DSA;
 	case KEY_ECDSA_CERT:
@@ -437,20 +420,14 @@ cert_free(struct sshkey_cert *cert)
 
 	if (cert == NULL)
 		return;
-	if (cert->certblob != NULL)
-		sshbuf_free(cert->certblob);
-	if (cert->critical != NULL)
-		sshbuf_free(cert->critical);
-	if (cert->extensions != NULL)
-		sshbuf_free(cert->extensions);
-	if (cert->key_id != NULL)
-		free(cert->key_id);
+	sshbuf_free(cert->certblob);
+	sshbuf_free(cert->critical);
+	sshbuf_free(cert->extensions);
+	free(cert->key_id);
 	for (i = 0; i < cert->nprincipals; i++)
 		free(cert->principals[i]);
-	if (cert->principals != NULL)
-		free(cert->principals);
-	if (cert->signature_key != NULL)
-		sshkey_free(cert->signature_key);
+	free(cert->principals);
+	sshkey_free(cert->signature_key);
 	explicit_bzero(cert, sizeof(*cert));
 	free(cert);
 }
@@ -497,7 +474,6 @@ sshkey_new(int type)
 #ifdef WITH_OPENSSL
 	case KEY_RSA1:
 	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if ((rsa = RSA_new()) == NULL ||
 		    (rsa->n = BN_new()) == NULL ||
@@ -510,7 +486,6 @@ sshkey_new(int type)
 		k->rsa = rsa;
 		break;
 	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if ((dsa = DSA_new()) == NULL ||
 		    (dsa->p = BN_new()) == NULL ||
@@ -558,7 +533,6 @@ sshkey_add_private(struct sshkey *k)
 #ifdef WITH_OPENSSL
 	case KEY_RSA1:
 	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 #define bn_maybe_alloc_failed(p) (p == NULL && (p = BN_new()) == NULL)
 		if (bn_maybe_alloc_failed(k->rsa->d) ||
@@ -570,7 +544,6 @@ sshkey_add_private(struct sshkey *k)
 			return SSH_ERR_ALLOC_FAIL;
 		break;
 	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if (bn_maybe_alloc_failed(k->dsa->priv_key))
 			return SSH_ERR_ALLOC_FAIL;
@@ -616,14 +589,12 @@ sshkey_free(struct sshkey *k)
 #ifdef WITH_OPENSSL
 	case KEY_RSA1:
 	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if (k->rsa != NULL)
 			RSA_free(k->rsa);
 		k->rsa = NULL;
 		break;
 	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if (k->dsa != NULL)
 			DSA_free(k->dsa);
@@ -695,13 +666,11 @@ sshkey_equal_public(const struct sshkey *a, const struct sshkey *b)
 	switch (a->type) {
 #ifdef WITH_OPENSSL
 	case KEY_RSA1:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 	case KEY_RSA:
 		return a->rsa != NULL && b->rsa != NULL &&
 		    BN_cmp(a->rsa->e, b->rsa->e) == 0 &&
 		    BN_cmp(a->rsa->n, b->rsa->n) == 0;
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 	case KEY_DSA:
 		return a->dsa != NULL && b->dsa != NULL &&
@@ -761,13 +730,17 @@ to_blob_buf(const struct sshkey *key, struct sshbuf *b, int force_plain)
 	if (key == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
 
+	if (sshkey_is_cert(key)) {
+		if (key->cert == NULL)
+			return SSH_ERR_EXPECTED_CERT;
+		if (sshbuf_len(key->cert->certblob) == 0)
+			return SSH_ERR_KEY_LACKS_CERTBLOB;
+	}
 	type = force_plain ? sshkey_type_plain(key->type) : key->type;
 	typename = sshkey_ssh_name_from_type_nid(type, key->ecdsa_nid);
 
 	switch (type) {
 #ifdef WITH_OPENSSL
-	case KEY_DSA_CERT_V00:
-	case KEY_RSA_CERT_V00:
 	case KEY_DSA_CERT:
 	case KEY_ECDSA_CERT:
 	case KEY_RSA_CERT:
@@ -1240,7 +1213,7 @@ read_decimal_bignum(char **cpp, BIGNUM *v)
 		return SSH_ERR_BIGNUM_TOO_LARGE;
 	if (cp[e] == '\0')
 		skip = 0;
-	else if (index(" \t\r\n", cp[e]) == NULL)
+	else if (strchr(" \t\r\n", cp[e]) == NULL)
 		return SSH_ERR_INVALID_FORMAT;
 	cp[e] = '\0';
 	if (BN_dec2bn(&v, cp) <= 0)
@@ -1256,11 +1229,10 @@ sshkey_read(struct sshkey *ret, char **cpp)
 {
 	struct sshkey *k;
 	int retval = SSH_ERR_INVALID_FORMAT;
-	char *cp, *space;
+	char *ep, *cp, *space;
 	int r, type, curve_nid = -1;
 	struct sshbuf *blob;
 #ifdef WITH_SSH1
-	char *ep;
 	u_long bits;
 #endif /* WITH_SSH1 */
 
@@ -1271,7 +1243,7 @@ sshkey_read(struct sshkey *ret, char **cpp)
 #ifdef WITH_SSH1
 		/* Get number of bits. */
 		bits = strtoul(cp, &ep, 10);
-		if (*cp == '\0' || index(" \t\r\n", *ep) == NULL ||
+		if (*cp == '\0' || strchr(" \t\r\n", *ep) == NULL ||
 		    bits == 0 || bits > SSHBUF_MAX_BIGNUM * 8)
 			return SSH_ERR_INVALID_FORMAT;	/* Bad bit count... */
 		/* Get public exponent, public modulus. */
@@ -1279,10 +1251,10 @@ sshkey_read(struct sshkey *ret, char **cpp)
 			return r;
 		if ((r = read_decimal_bignum(&ep, ret->rsa->n)) < 0)
 			return r;
-		*cpp = ep;
 		/* validate the claimed number of bits */
 		if (BN_num_bits(ret->rsa->n) != (int)bits)
 			return SSH_ERR_KEY_BITS_MISMATCH;
+		*cpp = ep;
 		retval = 0;
 #endif /* WITH_SSH1 */
 		break;
@@ -1291,8 +1263,6 @@ sshkey_read(struct sshkey *ret, char **cpp)
 	case KEY_DSA:
 	case KEY_ECDSA:
 	case KEY_ED25519:
-	case KEY_DSA_CERT_V00:
-	case KEY_RSA_CERT_V00:
 	case KEY_DSA_CERT:
 	case KEY_ECDSA_CERT:
 	case KEY_RSA_CERT:
@@ -1322,9 +1292,9 @@ sshkey_read(struct sshkey *ret, char **cpp)
 			*space++ = '\0';
 			while (*space == ' ' || *space == '\t')
 				space++;
-			*cpp = space;
+			ep = space;
 		} else
-			*cpp = cp + strlen(cp);
+			ep = cp + strlen(cp);
 		if ((r = sshbuf_b64tod(blob, cp)) != 0) {
 			sshbuf_free(blob);
 			return r;
@@ -1355,8 +1325,9 @@ sshkey_read(struct sshkey *ret, char **cpp)
 			ret->cert = k->cert;
 			k->cert = NULL;
 		}
+		switch (sshkey_type_plain(ret->type)) {
 #ifdef WITH_OPENSSL
-		if (sshkey_type_plain(ret->type) == KEY_RSA) {
+		case KEY_RSA:
 			if (ret->rsa != NULL)
 				RSA_free(ret->rsa);
 			ret->rsa = k->rsa;
@@ -1364,8 +1335,8 @@ sshkey_read(struct sshkey *ret, char **cpp)
 #ifdef DEBUG_PK
 			RSA_print_fp(stderr, ret->rsa, 8);
 #endif
-		}
-		if (sshkey_type_plain(ret->type) == KEY_DSA) {
+			break;
+		case KEY_DSA:
 			if (ret->dsa != NULL)
 				DSA_free(ret->dsa);
 			ret->dsa = k->dsa;
@@ -1373,9 +1344,9 @@ sshkey_read(struct sshkey *ret, char **cpp)
 #ifdef DEBUG_PK
 			DSA_print_fp(stderr, ret->dsa, 8);
 #endif
-		}
+			break;
 # ifdef OPENSSL_HAS_ECC
-		if (sshkey_type_plain(ret->type) == KEY_ECDSA) {
+		case KEY_ECDSA:
 			if (ret->ecdsa != NULL)
 				EC_KEY_free(ret->ecdsa);
 			ret->ecdsa = k->ecdsa;
@@ -1385,17 +1356,19 @@ sshkey_read(struct sshkey *ret, char **cpp)
 #ifdef DEBUG_PK
 			sshkey_dump_ec_key(ret->ecdsa);
 #endif
-		}
+			break;
 # endif /* OPENSSL_HAS_ECC */
 #endif /* WITH_OPENSSL */
-		if (sshkey_type_plain(ret->type) == KEY_ED25519) {
+		case KEY_ED25519:
 			free(ret->ed25519_pk);
 			ret->ed25519_pk = k->ed25519_pk;
 			k->ed25519_pk = NULL;
 #ifdef DEBUG_PK
 			/* XXX */
 #endif
+			break;
 		}
+		*cpp = ep;
 		retval = 0;
 /*XXXX*/
 		sshkey_free(k);
@@ -1409,98 +1382,116 @@ sshkey_read(struct sshkey *ret, char **cpp)
 }
 
 int
-sshkey_write(const struct sshkey *key, FILE *f)
+sshkey_to_base64(const struct sshkey *key, char **b64p)
 {
-	int ret = SSH_ERR_INTERNAL_ERROR;
-	struct sshbuf *b = NULL, *bb = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	struct sshbuf *b = NULL;
 	char *uu = NULL;
+
+	if (b64p != NULL)
+		*b64p = NULL;
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshkey_putb(key, b)) != 0)
+		goto out;
+	if ((uu = sshbuf_dtob64(b)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	/* Success */
+	if (b64p != NULL) {
+		*b64p = uu;
+		uu = NULL;
+	}
+	r = 0;
+ out:
+	sshbuf_free(b);
+	free(uu);
+	return r;
+}
+
+static int
+sshkey_format_rsa1(const struct sshkey *key, struct sshbuf *b)
+{
+	int r = SSH_ERR_INTERNAL_ERROR;
 #ifdef WITH_SSH1
 	u_int bits = 0;
 	char *dec_e = NULL, *dec_n = NULL;
-#endif /* WITH_SSH1 */
 
-	if (sshkey_is_cert(key)) {
-		if (key->cert == NULL)
-			return SSH_ERR_EXPECTED_CERT;
-		if (sshbuf_len(key->cert->certblob) == 0)
-			return SSH_ERR_KEY_LACKS_CERTBLOB;
-	}
-	if ((b = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	switch (key->type) {
-#ifdef WITH_SSH1
-	case KEY_RSA1:
-		if (key->rsa == NULL || key->rsa->e == NULL ||
-		    key->rsa->n == NULL) {
-			ret = SSH_ERR_INVALID_ARGUMENT;
-			goto out;
-		}
-		if ((dec_e = BN_bn2dec(key->rsa->e)) == NULL ||
-		    (dec_n = BN_bn2dec(key->rsa->n)) == NULL) {
-			ret = SSH_ERR_ALLOC_FAIL;
-			goto out;
-		}
-		/* size of modulus 'n' */
-		if ((bits = BN_num_bits(key->rsa->n)) <= 0) {
-			ret = SSH_ERR_INVALID_ARGUMENT;
-			goto out;
-		}
-		if ((ret = sshbuf_putf(b, "%u %s %s", bits, dec_e, dec_n)) != 0)
-			goto out;
-#endif /* WITH_SSH1 */
-		break;
-#ifdef WITH_OPENSSL
-	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
-	case KEY_DSA_CERT:
-	case KEY_ECDSA:
-	case KEY_ECDSA_CERT:
-	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
-	case KEY_RSA_CERT:
-#endif /* WITH_OPENSSL */
-	case KEY_ED25519:
-	case KEY_ED25519_CERT:
-		if ((bb = sshbuf_new()) == NULL) {
-			ret = SSH_ERR_ALLOC_FAIL;
-			goto out;
-		}
-		if ((ret = sshkey_putb(key, bb)) != 0)
-			goto out;
-		if ((uu = sshbuf_dtob64(bb)) == NULL) {
-			ret = SSH_ERR_ALLOC_FAIL;
-			goto out;
-		}
-		if ((ret = sshbuf_putf(b, "%s ", sshkey_ssh_name(key))) != 0)
-			goto out;
-		if ((ret = sshbuf_put(b, uu, strlen(uu))) != 0)
-			goto out;
-		break;
-	default:
-		ret = SSH_ERR_KEY_TYPE_UNKNOWN;
+	if (key->rsa == NULL || key->rsa->e == NULL ||
+	    key->rsa->n == NULL) {
+		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;
 	}
-	if (fwrite(sshbuf_ptr(b), sshbuf_len(b), 1, f) != 1) {
-		if (feof(f))
-			errno = EPIPE;
-		ret = SSH_ERR_SYSTEM_ERROR;
+	if ((dec_e = BN_bn2dec(key->rsa->e)) == NULL ||
+	    (dec_n = BN_bn2dec(key->rsa->n)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	ret = 0;
+	/* size of modulus 'n' */
+	if ((bits = BN_num_bits(key->rsa->n)) <= 0) {
+		r = SSH_ERR_INVALID_ARGUMENT;
+		goto out;
+	}
+	if ((r = sshbuf_putf(b, "%u %s %s", bits, dec_e, dec_n)) != 0)
+		goto out;
+
+	/* Success */
+	r = 0;
  out:
-	if (b != NULL)
-		sshbuf_free(b);
-	if (bb != NULL)
-		sshbuf_free(bb);
-	if (uu != NULL)
-		free(uu);
-#ifdef WITH_SSH1
 	if (dec_e != NULL)
 		OPENSSL_free(dec_e);
 	if (dec_n != NULL)
 		OPENSSL_free(dec_n);
 #endif /* WITH_SSH1 */
-	return ret;
+
+	return r;
+}
+
+static int
+sshkey_format_text(const struct sshkey *key, struct sshbuf *b)
+{
+	int r = SSH_ERR_INTERNAL_ERROR;
+	char *uu = NULL;
+
+	if (key->type == KEY_RSA1) {
+		if ((r = sshkey_format_rsa1(key, b)) != 0)
+			goto out;
+	} else {
+		/* Unsupported key types handled in sshkey_to_base64() */
+		if ((r = sshkey_to_base64(key, &uu)) != 0)
+			goto out;
+		if ((r = sshbuf_putf(b, "%s %s",
+		    sshkey_ssh_name(key), uu)) != 0)
+			goto out;
+	}
+	r = 0;
+ out:
+	free(uu);
+	return r;
+}
+
+int
+sshkey_write(const struct sshkey *key, FILE *f)
+{
+	struct sshbuf *b = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshkey_format_text(key, b)) != 0)
+		goto out;
+	if (fwrite(sshbuf_ptr(b), sshbuf_len(b), 1, f) != 1) {
+		if (feof(f))
+			errno = EPIPE;
+		r = SSH_ERR_SYSTEM_ERROR;
+		goto out;
+	}
+	/* Success */
+	r = 0;
+ out:
+	sshbuf_free(b);
+	return r;
 }
 
 const char *
@@ -1564,7 +1555,6 @@ dsa_generate_private_key(u_int bits, DSA **dsap)
 	*dsap = NULL;
 	if (!DSA_generate_parameters_ex(private, bits, NULL, 0, NULL,
 	    NULL, NULL) || !DSA_generate_key(private)) {
-		DSA_free(private);
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
@@ -1726,7 +1716,7 @@ sshkey_cert_copy(const struct sshkey *from_key, struct sshkey *to_key)
 
 	if ((ret = sshbuf_putb(to->certblob, from->certblob)) != 0 ||
 	    (ret = sshbuf_putb(to->critical, from->critical)) != 0 ||
-	    (ret = sshbuf_putb(to->extensions, from->extensions) != 0))
+	    (ret = sshbuf_putb(to->extensions, from->extensions)) != 0)
 		return ret;
 
 	to->serial = from->serial;
@@ -1767,13 +1757,10 @@ sshkey_from_private(const struct sshkey *k, struct sshkey **pkp)
 	struct sshkey *n = NULL;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
-	if (pkp != NULL)
-		*pkp = NULL;
-
+	*pkp = NULL;
 	switch (k->type) {
 #ifdef WITH_OPENSSL
 	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if ((n = sshkey_new(k->type)) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
@@ -1805,7 +1792,6 @@ sshkey_from_private(const struct sshkey *k, struct sshkey **pkp)
 # endif /* OPENSSL_HAS_ECC */
 	case KEY_RSA:
 	case KEY_RSA1:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if ((n = sshkey_new(k->type)) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
@@ -1849,21 +1835,20 @@ cert_parse(struct sshbuf *b, struct sshkey *key, struct sshbuf *certbuf)
 	u_char *sig = NULL;
 	size_t signed_len = 0, slen = 0, kidlen = 0;
 	int ret = SSH_ERR_INTERNAL_ERROR;
-	int v00 = sshkey_cert_is_legacy(key);
 
 	/* Copy the entire key blob for verification and later serialisation */
 	if ((ret = sshbuf_putb(key->cert->certblob, certbuf)) != 0)
 		return ret;
 
-	if ((!v00 && (ret = sshbuf_get_u64(b, &key->cert->serial)) != 0) ||
+	/* Parse body of certificate up to signature */
+	if ((ret = sshbuf_get_u64(b, &key->cert->serial)) != 0 ||
 	    (ret = sshbuf_get_u32(b, &key->cert->type)) != 0 ||
 	    (ret = sshbuf_get_cstring(b, &key->cert->key_id, &kidlen)) != 0 ||
 	    (ret = sshbuf_froms(b, &principals)) != 0 ||
 	    (ret = sshbuf_get_u64(b, &key->cert->valid_after)) != 0 ||
 	    (ret = sshbuf_get_u64(b, &key->cert->valid_before)) != 0 ||
 	    (ret = sshbuf_froms(b, &crit)) != 0 ||
-	    (!v00 && (ret = sshbuf_froms(b, &exts)) != 0) ||
-	    (v00 && (ret = sshbuf_get_string_direct(b, NULL, NULL)) != 0) ||
+	    (ret = sshbuf_froms(b, &exts)) != 0 ||
 	    (ret = sshbuf_get_string_direct(b, NULL, NULL)) != 0 ||
 	    (ret = sshbuf_froms(b, &ca)) != 0) {
 		/* XXX debug print error for ret */
@@ -1900,9 +1885,8 @@ cert_parse(struct sshbuf *b, struct sshkey *key, struct sshbuf *certbuf)
 			goto out;
 		}
 		oprincipals = key->cert->principals;
-		key->cert->principals = realloc(key->cert->principals,
-		    (key->cert->nprincipals + 1) *
-		    sizeof(*key->cert->principals));
+		key->cert->principals = reallocarray(key->cert->principals,
+		    key->cert->nprincipals + 1, sizeof(*key->cert->principals));
 		if (key->cert->principals == NULL) {
 			free(principal);
 			key->cert->principals = oprincipals;
@@ -1923,7 +1907,6 @@ cert_parse(struct sshbuf *b, struct sshkey *key, struct sshbuf *certbuf)
 
 	/*
 	 * Validate critical options and extensions sections format.
-	 * NB. extensions are not present in v00 certs.
 	 */
 	while (sshbuf_len(crit) != 0) {
 		if ((ret = sshbuf_get_string_direct(crit, NULL, NULL)) != 0 ||
@@ -2008,13 +1991,12 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 		}
 		/* FALLTHROUGH */
 	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
 		if ((key = sshkey_new(type)) == NULL) {
 			ret = SSH_ERR_ALLOC_FAIL;
 			goto out;
 		}
-		if (sshbuf_get_bignum2(b, key->rsa->e) == -1 ||
-		    sshbuf_get_bignum2(b, key->rsa->n) == -1) {
+		if (sshbuf_get_bignum2(b, key->rsa->e) != 0 ||
+		    sshbuf_get_bignum2(b, key->rsa->n) != 0) {
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
@@ -2030,15 +2012,14 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 		}
 		/* FALLTHROUGH */
 	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
 		if ((key = sshkey_new(type)) == NULL) {
 			ret = SSH_ERR_ALLOC_FAIL;
 			goto out;
 		}
-		if (sshbuf_get_bignum2(b, key->dsa->p) == -1 ||
-		    sshbuf_get_bignum2(b, key->dsa->q) == -1 ||
-		    sshbuf_get_bignum2(b, key->dsa->g) == -1 ||
-		    sshbuf_get_bignum2(b, key->dsa->pub_key) == -1) {
+		if (sshbuf_get_bignum2(b, key->dsa->p) != 0 ||
+		    sshbuf_get_bignum2(b, key->dsa->q) != 0 ||
+		    sshbuf_get_bignum2(b, key->dsa->g) != 0 ||
+		    sshbuf_get_bignum2(b, key->dsa->pub_key) != 0) {
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
@@ -2190,7 +2171,7 @@ sshkey_froms(struct sshbuf *buf, struct sshkey **keyp)
 int
 sshkey_sign(const struct sshkey *key,
     u_char **sigp, size_t *lenp,
-    const u_char *data, size_t datalen, u_int compat)
+    const u_char *data, size_t datalen, const char *alg, u_int compat)
 {
 	if (sigp != NULL)
 		*sigp = NULL;
@@ -2200,7 +2181,6 @@ sshkey_sign(const struct sshkey *key,
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
 #ifdef WITH_OPENSSL
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 	case KEY_DSA:
 		return ssh_dss_sign(key, sigp, lenp, data, datalen, compat);
@@ -2209,10 +2189,9 @@ sshkey_sign(const struct sshkey *key,
 	case KEY_ECDSA:
 		return ssh_ecdsa_sign(key, sigp, lenp, data, datalen, compat);
 # endif /* OPENSSL_HAS_ECC */
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 	case KEY_RSA:
-		return ssh_rsa_sign(key, sigp, lenp, data, datalen, compat);
+		return ssh_rsa_sign(key, sigp, lenp, data, datalen, alg);
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:
 	case KEY_ED25519_CERT:
@@ -2234,7 +2213,6 @@ sshkey_verify(const struct sshkey *key,
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
 #ifdef WITH_OPENSSL
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 	case KEY_DSA:
 		return ssh_dss_verify(key, sig, siglen, data, dlen, compat);
@@ -2243,10 +2221,9 @@ sshkey_verify(const struct sshkey *key,
 	case KEY_ECDSA:
 		return ssh_ecdsa_verify(key, sig, siglen, data, dlen, compat);
 # endif /* OPENSSL_HAS_ECC */
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 	case KEY_RSA:
-		return ssh_rsa_verify(key, sig, siglen, data, dlen, compat);
+		return ssh_rsa_verify(key, sig, siglen, data, dlen);
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:
 	case KEY_ED25519_CERT:
@@ -2263,9 +2240,7 @@ sshkey_demote(const struct sshkey *k, struct sshkey **dkp)
 	struct sshkey *pk;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
-	if (dkp != NULL)
-		*dkp = NULL;
-
+	*dkp = NULL;
 	if ((pk = calloc(1, sizeof(*pk))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	pk->type = k->type;
@@ -2279,7 +2254,6 @@ sshkey_demote(const struct sshkey *k, struct sshkey **dkp)
 
 	switch (k->type) {
 #ifdef WITH_OPENSSL
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if ((ret = sshkey_cert_copy(k, pk)) != 0)
 			goto fail;
@@ -2293,7 +2267,6 @@ sshkey_demote(const struct sshkey *k, struct sshkey **dkp)
 			goto fail;
 			}
 		break;
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if ((ret = sshkey_cert_copy(k, pk)) != 0)
 			goto fail;
@@ -2352,27 +2325,23 @@ sshkey_demote(const struct sshkey *k, struct sshkey **dkp)
 
 /* Convert a plain key to their _CERT equivalent */
 int
-sshkey_to_certified(struct sshkey *k, int legacy)
+sshkey_to_certified(struct sshkey *k)
 {
 	int newtype;
 
 	switch (k->type) {
 #ifdef WITH_OPENSSL
 	case KEY_RSA:
-		newtype = legacy ? KEY_RSA_CERT_V00 : KEY_RSA_CERT;
+		newtype = KEY_RSA_CERT;
 		break;
 	case KEY_DSA:
-		newtype = legacy ? KEY_DSA_CERT_V00 : KEY_DSA_CERT;
+		newtype = KEY_DSA_CERT;
 		break;
 	case KEY_ECDSA:
-		if (legacy)
-			return SSH_ERR_INVALID_ARGUMENT;
 		newtype = KEY_ECDSA_CERT;
 		break;
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:
-		if (legacy)
-			return SSH_ERR_INVALID_ARGUMENT;
 		newtype = KEY_ED25519_CERT;
 		break;
 	default:
@@ -2424,15 +2393,12 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 
 	/* -v01 certs put nonce first */
 	arc4random_buf(&nonce, sizeof(nonce));
-	if (!sshkey_cert_is_legacy(k)) {
-		if ((ret = sshbuf_put_string(cert, nonce, sizeof(nonce))) != 0)
-			goto out;
-	}
+	if ((ret = sshbuf_put_string(cert, nonce, sizeof(nonce))) != 0)
+		goto out;
 
 	/* XXX this substantially duplicates to_blob(); refactor */
 	switch (k->type) {
 #ifdef WITH_OPENSSL
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if ((ret = sshbuf_put_bignum2(cert, k->dsa->p)) != 0 ||
 		    (ret = sshbuf_put_bignum2(cert, k->dsa->q)) != 0 ||
@@ -2450,7 +2416,6 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 			goto out;
 		break;
 # endif /* OPENSSL_HAS_ECC */
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if ((ret = sshbuf_put_bignum2(cert, k->rsa->e)) != 0 ||
 		    (ret = sshbuf_put_bignum2(cert, k->rsa->n)) != 0)
@@ -2467,13 +2432,8 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 		goto out;
 	}
 
-	/* -v01 certs have a serial number next */
-	if (!sshkey_cert_is_legacy(k)) {
-		if ((ret = sshbuf_put_u64(cert, k->cert->serial)) != 0)
-			goto out;
-	}
-
-	if ((ret = sshbuf_put_u32(cert, k->cert->type)) != 0 ||
+	if ((ret = sshbuf_put_u64(cert, k->cert->serial)) != 0 ||
+	    (ret = sshbuf_put_u32(cert, k->cert->type)) != 0 ||
 	    (ret = sshbuf_put_cstring(cert, k->cert->key_id)) != 0)
 		goto out;
 
@@ -2489,28 +2449,15 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 	if ((ret = sshbuf_put_stringb(cert, principals)) != 0 ||
 	    (ret = sshbuf_put_u64(cert, k->cert->valid_after)) != 0 ||
 	    (ret = sshbuf_put_u64(cert, k->cert->valid_before)) != 0 ||
-	    (ret = sshbuf_put_stringb(cert, k->cert->critical)) != 0)
-		goto out;
-
-	/* -v01 certs have non-critical options here */
-	if (!sshkey_cert_is_legacy(k)) {
-		if ((ret = sshbuf_put_stringb(cert, k->cert->extensions)) != 0)
-			goto out;
-	}
-
-	/* -v00 certs put the nonce at the end */
-	if (sshkey_cert_is_legacy(k)) {
-		if ((ret = sshbuf_put_string(cert, nonce, sizeof(nonce))) != 0)
-			goto out;
-	}
-
-	if ((ret = sshbuf_put_string(cert, NULL, 0)) != 0 || /* Reserved */
+	    (ret = sshbuf_put_stringb(cert, k->cert->critical)) != 0 ||
+	    (ret = sshbuf_put_stringb(cert, k->cert->extensions)) != 0 ||
+	    (ret = sshbuf_put_string(cert, NULL, 0)) != 0 || /* Reserved */
 	    (ret = sshbuf_put_string(cert, ca_blob, ca_len)) != 0)
 		goto out;
 
 	/* Sign the whole mess */
 	if ((ret = sshkey_sign(ca, &sig_blob, &sig_len, sshbuf_ptr(cert),
-	    sshbuf_len(cert), 0)) != 0)
+	    sshbuf_len(cert), NULL, 0)) != 0)
 		goto out;
 
 	/* Append signature and we are done */
@@ -2520,12 +2467,9 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
  out:
 	if (ret != 0)
 		sshbuf_reset(cert);
-	if (sig_blob != NULL)
-		free(sig_blob);
-	if (ca_blob != NULL)
-		free(ca_blob);
-	if (principals != NULL)
-		sshbuf_free(principals);
+	free(sig_blob);
+	free(ca_blob);
+	sshbuf_free(principals);
 	return ret;
 }
 
@@ -2586,6 +2530,43 @@ sshkey_cert_check_authority(const struct sshkey *k,
 	return 0;
 }
 
+size_t
+sshkey_format_cert_validity(const struct sshkey_cert *cert, char *s, size_t l)
+{
+	char from[32], to[32], ret[64];
+	time_t tt;
+	struct tm *tm;
+
+	*from = *to = '\0';
+	if (cert->valid_after == 0 &&
+	    cert->valid_before == 0xffffffffffffffffULL)
+		return strlcpy(s, "forever", l);
+
+	if (cert->valid_after != 0) {
+		/* XXX revisit INT_MAX in 2038 :) */
+		tt = cert->valid_after > INT_MAX ?
+		    INT_MAX : cert->valid_after;
+		tm = localtime(&tt);
+		strftime(from, sizeof(from), "%Y-%m-%dT%H:%M:%S", tm);
+	}
+	if (cert->valid_before != 0xffffffffffffffffULL) {
+		/* XXX revisit INT_MAX in 2038 :) */
+		tt = cert->valid_before > INT_MAX ?
+		    INT_MAX : cert->valid_before;
+		tm = localtime(&tt);
+		strftime(to, sizeof(to), "%Y-%m-%dT%H:%M:%S", tm);
+	}
+
+	if (cert->valid_after == 0)
+		snprintf(ret, sizeof(ret), "before %s", to);
+	else if (cert->valid_before == 0xffffffffffffffffULL)
+		snprintf(ret, sizeof(ret), "after %s", from);
+	else
+		snprintf(ret, sizeof(ret), "from %s to %s", from, to);
+
+	return strlcpy(s, ret, l);
+}
+
 int
 sshkey_private_serialize(const struct sshkey *key, struct sshbuf *b)
 {
@@ -2604,7 +2585,6 @@ sshkey_private_serialize(const struct sshkey *key, struct sshbuf *b)
 		    (r = sshbuf_put_bignum2(b, key->rsa->q)) != 0)
 			goto out;
 		break;
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if (key->cert == NULL || sshbuf_len(key->cert->certblob) == 0) {
 			r = SSH_ERR_INVALID_ARGUMENT;
@@ -2625,7 +2605,6 @@ sshkey_private_serialize(const struct sshkey *key, struct sshbuf *b)
 		    (r = sshbuf_put_bignum2(b, key->dsa->priv_key)) != 0)
 			goto out;
 		break;
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if (key->cert == NULL || sshbuf_len(key->cert->certblob) == 0) {
 			r = SSH_ERR_INVALID_ARGUMENT;
@@ -2716,7 +2695,6 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 		    (r = sshbuf_get_bignum2(buf, k->dsa->priv_key)) != 0)
 			goto out;
 		break;
-	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if ((r = sshkey_froms(buf, &k)) != 0 ||
 		    (r = sshkey_add_private(k)) != 0 ||
@@ -2752,7 +2730,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 			goto out;
 		}
 		if ((r = sshkey_ec_validate_public(EC_KEY_get0_group(k->ecdsa),
-		    EC_KEY_get0_public_key(k->ecdsa)) != 0) ||
+		    EC_KEY_get0_public_key(k->ecdsa))) != 0 ||
 		    (r = sshkey_ec_validate_private(k->ecdsa)) != 0)
 			goto out;
 		break;
@@ -2770,7 +2748,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 			goto out;
 		}
 		if ((r = sshkey_ec_validate_public(EC_KEY_get0_group(k->ecdsa),
-		    EC_KEY_get0_public_key(k->ecdsa)) != 0) ||
+		    EC_KEY_get0_public_key(k->ecdsa))) != 0 ||
 		    (r = sshkey_ec_validate_private(k->ecdsa)) != 0)
 			goto out;
 		break;
@@ -2789,14 +2767,13 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 		    (r = rsa_generate_additional_parameters(k->rsa)) != 0)
 			goto out;
 		break;
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if ((r = sshkey_froms(buf, &k)) != 0 ||
 		    (r = sshkey_add_private(k)) != 0 ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->d) != 0) ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->iqmp) != 0) ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->p) != 0) ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->q) != 0) ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->d)) != 0 ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->iqmp)) != 0 ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->p)) != 0 ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->q)) != 0 ||
 		    (r = rsa_generate_additional_parameters(k->rsa)) != 0)
 			goto out;
 		break;
@@ -2839,7 +2816,6 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 	/* enable blinding */
 	switch (k->type) {
 	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 	case KEY_RSA1:
 		if (RSA_blinding_on(k->rsa, NULL) != 1) {
@@ -3201,7 +3177,7 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	const u_char *cp;
 	int r = SSH_ERR_INTERNAL_ERROR;
 	size_t encoded_len;
-	size_t i, keylen = 0, ivlen = 0, slen = 0;
+	size_t i, keylen = 0, ivlen = 0, authlen = 0, slen = 0;
 	struct sshbuf *encoded = NULL, *decoded = NULL;
 	struct sshbuf *kdf = NULL, *decrypted = NULL;
 	struct sshcipher_ctx ciphercontext;
@@ -3311,6 +3287,7 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	/* setup key */
 	keylen = cipher_keylen(cipher);
 	ivlen = cipher_ivlen(cipher);
+	authlen = cipher_authlen(cipher);
 	if ((key = calloc(1, keylen + ivlen)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
@@ -3326,19 +3303,25 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 		}
 	}
 
+	/* check that an appropriate amount of auth data is present */
+	if (sshbuf_len(decoded) < encrypted_len + authlen) {
+		r = SSH_ERR_INVALID_FORMAT;
+		goto out;
+	}
+
 	/* decrypt private portion of key */
 	if ((r = sshbuf_reserve(decrypted, encrypted_len, &dp)) != 0 ||
 	    (r = cipher_init(&ciphercontext, cipher, key, keylen,
 	    key + keylen, ivlen, 0)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&ciphercontext, 0, dp, sshbuf_ptr(decoded),
-	    sshbuf_len(decoded), 0, cipher_authlen(cipher))) != 0) {
+	    encrypted_len, 0, authlen)) != 0) {
 		/* an integrity error here indicates an incorrect passphrase */
 		if (r == SSH_ERR_MAC_INVALID)
 			r = SSH_ERR_KEY_WRONG_PASSPHRASE;
 		goto out;
 	}
-	if ((r = sshbuf_consume(decoded, encrypted_len)) != 0)
+	if ((r = sshbuf_consume(decoded, encrypted_len + authlen)) != 0)
 		goto out;
 	/* there should be no trailing data */
 	if (sshbuf_len(decoded) != 0) {
@@ -3477,9 +3460,9 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 
 	/* Store public key.  This will be in plain text. */
 	if ((r = sshbuf_put_u32(encrypted, BN_num_bits(key->rsa->n))) != 0 ||
-	    (r = sshbuf_put_bignum1(encrypted, key->rsa->n) != 0) ||
-	    (r = sshbuf_put_bignum1(encrypted, key->rsa->e) != 0) ||
-	    (r = sshbuf_put_cstring(encrypted, comment) != 0))
+	    (r = sshbuf_put_bignum1(encrypted, key->rsa->n)) != 0 ||
+	    (r = sshbuf_put_bignum1(encrypted, key->rsa->e)) != 0 ||
+	    (r = sshbuf_put_cstring(encrypted, comment)) != 0)
 		goto out;
 
 	/* Allocate space for the private part of the key in the buffer. */
@@ -3500,10 +3483,8 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
  out:
 	explicit_bzero(&ciphercontext, sizeof(ciphercontext));
 	explicit_bzero(buf, sizeof(buf));
-	if (buffer != NULL)
-		sshbuf_free(buffer);
-	if (encrypted != NULL)
-		sshbuf_free(encrypted);
+	sshbuf_free(buffer);
+	sshbuf_free(encrypted);
 
 	return r;
 }
@@ -3657,10 +3638,8 @@ sshkey_parse_public_rsa1_fileblob(struct sshbuf *blob,
 	pub = NULL;
 
  out:
-	if (copy != NULL)
-		sshbuf_free(copy);
-	if (pub != NULL)
-		sshkey_free(pub);
+	sshbuf_free(copy);
+	sshkey_free(pub);
 	return r;
 }
 
@@ -3772,14 +3751,10 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	}
  out:
 	explicit_bzero(&ciphercontext, sizeof(ciphercontext));
-	if (comment != NULL)
-		free(comment);
-	if (prv != NULL)
-		sshkey_free(prv);
-	if (copy != NULL)
-		sshbuf_free(copy);
-	if (decrypted != NULL)
-		sshbuf_free(decrypted);
+	free(comment);
+	sshkey_free(prv);
+	sshbuf_free(copy);
+	sshbuf_free(decrypted);
 	return r;
 }
 #endif /* WITH_SSH1 */
@@ -3869,8 +3844,7 @@ sshkey_parse_private_pem_fileblob(struct sshbuf *blob, int type,
 	BIO_free(bio);
 	if (pk != NULL)
 		EVP_PKEY_free(pk);
-	if (prv != NULL)
-		sshkey_free(prv);
+	sshkey_free(prv);
 	return r;
 }
 #endif /* WITH_OPENSSL */
@@ -3879,8 +3853,6 @@ int
 sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
     const char *passphrase, struct sshkey **keyp, char **commentp)
 {
-	int r;
-
 	*keyp = NULL;
 	if (commentp != NULL)
 		*commentp = NULL;
@@ -3902,8 +3874,8 @@ sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
 		return sshkey_parse_private2(blob, type, passphrase,
 		    keyp, commentp);
 	case KEY_UNSPEC:
-		if ((r = sshkey_parse_private2(blob, type, passphrase, keyp,
-		    commentp)) == 0)
+		if (sshkey_parse_private2(blob, type, passphrase, keyp,
+		    commentp) == 0)
 			return 0;
 #ifdef WITH_OPENSSL
 		return sshkey_parse_private_pem_fileblob(blob, type,
@@ -3918,10 +3890,8 @@ sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
 
 int
 sshkey_parse_private_fileblob(struct sshbuf *buffer, const char *passphrase,
-    const char *filename, struct sshkey **keyp, char **commentp)
+    struct sshkey **keyp, char **commentp)
 {
-	int r;
-
 	if (keyp != NULL)
 		*keyp = NULL;
 	if (commentp != NULL)
@@ -3929,13 +3899,11 @@ sshkey_parse_private_fileblob(struct sshbuf *buffer, const char *passphrase,
 
 #ifdef WITH_SSH1
 	/* it's a SSH v1 key if the public key part is readable */
-	if ((r = sshkey_parse_public_rsa1_fileblob(buffer, NULL, NULL)) == 0) {
+	if (sshkey_parse_public_rsa1_fileblob(buffer, NULL, NULL) == 0) {
 		return sshkey_parse_private_fileblob_type(buffer, KEY_RSA1,
 		    passphrase, keyp, commentp);
 	}
 #endif /* WITH_SSH1 */
-	if ((r = sshkey_parse_private_fileblob_type(buffer, KEY_UNSPEC,
-	    passphrase, keyp, commentp)) == 0)
-		return 0;
-	return r;
+	return sshkey_parse_private_fileblob_type(buffer, KEY_UNSPEC,
+	    passphrase, keyp, commentp);
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: key.c,v 1.127 2015/01/28 22:36:00 djm Exp $ */
+/* $OpenBSD: key.c,v 1.129 2015/12/04 16:41:28 markus Exp $ */
 /*
  * placed in the public domain
  */
@@ -132,7 +132,7 @@ key_to_blob(const Key *key, u_char **blobp, u_int *lenp)
 
 int
 key_sign(const Key *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen)
+    const u_char *data, u_int datalen, const char *alg)
 {
 	int r;
 	u_char *sig;
@@ -143,7 +143,7 @@ key_sign(const Key *key, u_char **sigp, u_int *lenp,
 	if (lenp != NULL)
 		*lenp = 0;
 	if ((r = sshkey_sign(key, &sig, &siglen,
-	    data, datalen, datafellows)) != 0) {
+	    data, datalen, alg, datafellows)) != 0) {
 		fatal_on_fatal_errors(r, __func__, 0);
 		error("%s: %s", __func__, ssh_err(r));
 		return -1;
@@ -184,11 +184,11 @@ key_demote(const Key *k)
 }
 
 int
-key_to_certified(Key *k, int legacy)
+key_to_certified(Key *k)
 {
 	int r;
 
-	if ((r = sshkey_to_certified(k, legacy)) != 0) {
+	if ((r = sshkey_to_certified(k)) != 0) {
 		fatal_on_fatal_errors(r, __func__, 0);
 		error("%s: %s", __func__, ssh_err(r));
 		return -1;

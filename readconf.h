@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.h,v 1.109 2015/02/16 22:13:32 djm Exp $ */
+/* $OpenBSD: readconf.h,v 1.113 2016/01/14 16:17:40 markus Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -99,6 +99,13 @@ typedef struct {
 	int    identity_file_userprovided[SSH_MAX_IDENTITY_FILES];
 	struct sshkey *identity_keys[SSH_MAX_IDENTITY_FILES];
 
+	int	num_certificate_files; /* Number of extra certificates for ssh. */
+	char	*certificate_files[SSH_MAX_CERTIFICATE_FILES];
+	int	certificate_file_userprovided[SSH_MAX_CERTIFICATE_FILES];
+	struct sshkey *certificates[SSH_MAX_CERTIFICATE_FILES];
+
+	int	add_keys_to_agent;
+
 	/* Local TCP/IP forward requests. */
 	int     num_local_forwards;
 	struct Forward *local_forwards;
@@ -112,6 +119,7 @@ typedef struct {
 	int64_t rekey_limit;
 	int     none_switch;    /* Use none cipher */
 	int     none_enabled;   /* Allow none to be used */
+	int     disable_multithreaded; /*disable multithreaded aes-ctr*/
 	int	rekey_interval;
 
 	int	no_host_authentication_for_localhost;
@@ -137,8 +145,6 @@ typedef struct {
 	int	permit_local_command;
 	int	visual_host_key;
 
-	int	use_roaming;
-
 	int	request_tty;
 
 	int	proxy_use_fdpass;
@@ -157,7 +163,8 @@ typedef struct {
 
 	int	 update_hostkeys; /* one of SSH_UPDATE_HOSTKEYS_* */
 
-	char	*hostbased_key_types;
+	char   *hostbased_key_types;
+	char   *pubkey_key_types;
 
 	char	*ignored_unknown; /* Pattern list of unknown tokens to ignore */
 }       Options;
@@ -200,5 +207,6 @@ void	 dump_client_config(Options *o, const char *host);
 void	 add_local_forward(Options *, const struct Forward *);
 void	 add_remote_forward(Options *, const struct Forward *);
 void	 add_identity_file(Options *, const char *, const char *, int);
+void	 add_certificate_file(Options *, const char *, int);
 
 #endif				/* READCONF_H */
