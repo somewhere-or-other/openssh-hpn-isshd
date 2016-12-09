@@ -12,7 +12,7 @@ void     ssh_packet_put_ecpoint(struct ssh *, const EC_GROUP *, const EC_POINT *
 void     ssh_packet_put_string(struct ssh *, const void *buf, u_int len);
 void     ssh_packet_put_cstring(struct ssh *, const char *str);
 void     ssh_packet_put_raw(struct ssh *, const void *buf, u_int len);
-int      ssh_packet_send(struct ssh *);
+void     ssh_packet_send(struct ssh *);
 
 u_int	 ssh_packet_get_char(struct ssh *);
 u_int	 ssh_packet_get_int(struct ssh *);
@@ -144,10 +144,6 @@ void	packet_disconnect(const char *, ...)
 	ssh_packet_get_state(active_state, m)
 #define packet_set_state(m) \
 	ssh_packet_set_state(active_state, m)
-#if 0
-#define get_remote_ipaddr() \
-	ssh_remote_ipaddr(active_state)
-#endif
 #define packet_get_raw(lenp) \
         sshpkt_ptr(active_state, lenp)
 #define packet_get_ecpoint(c,p) \

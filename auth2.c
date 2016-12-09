@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2.c,v 1.135 2015/01/19 20:07:45 markus Exp $ */
+/* $OpenBSD: auth2.c,v 1.136 2016/05/02 08:49:03 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -50,7 +50,6 @@
 #include "dispatch.h"
 #include "pathnames.h"
 #include "buffer.h"
-#include "canohost.h"
 
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -229,7 +228,7 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 	debug("userauth-request for user %s service %s method %s", user, service, method);
 	if (!log_flag) {
 		logit("SSH: Server;Ltype: Authname;Remote: %s-%d;Name: %s",
-		      get_remote_ipaddr(), get_remote_port(), user);
+		      ssh_remote_ipaddr(active_state), ssh_remote_port(active_state), user);
 		log_flag = 1;
 	}
 	debug("attempt %d failures %d", authctxt->attempt, authctxt->failures);
@@ -432,8 +431,8 @@ authmethods_get(Authctxt *authctxt)
 		buffer_append(&b, authmethods[i]->name,
 		    strlen(authmethods[i]->name));
 	}
-	buffer_append(&b, "\0", 1);
-	list = xstrdup(buffer_ptr(&b));
+	if ((list = sshbuf_dup_string(&b)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
 	buffer_free(&b);
 	return list;
 }
