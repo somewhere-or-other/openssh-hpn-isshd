@@ -1181,6 +1181,7 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM([[ #include <stdio.h> ]], [[ exit(0); ]])],
 dnl Checks for header files.
 # Checks for libraries.
 AC_CHECK_FUNC([setsockopt], , [AC_CHECK_LIB([socket], [setsockopt])])
+AC_CHECK_FUNC([yp_match], , [AC_CHECK_LIB([nsl], [yp_match])])
 
 dnl IRIX and Solaris 2.5.1 have dirname() in libgen
 AC_CHECK_FUNCS([dirname], [AC_CHECK_HEADERS([libgen.h])] , [
@@ -1482,6 +1483,62 @@ AC_ARG_WITH([skey],
 			[
 				AC_MSG_RESULT([no])
 			])
+		fi
+	]
+)
+
+# Check whether user wants TCP wrappers support
+TCPW_MSG="no"
+AC_ARG_WITH([tcp-wrappers],
+	[  --with-tcp-wrappers[[=PATH]] Enable tcpwrappers support (optionally in PATH)],
+	[
+		if test "x$withval" != "xno" ; then
+			saved_LIBS="$LIBS"
+			saved_LDFLAGS="$LDFLAGS"
+			saved_CPPFLAGS="$CPPFLAGS"
+			if test -n "${withval}" && \
+			    test "x${withval}" != "xyes"; then
+				if test -d "${withval}/lib"; then
+					if test -n "${need_dash_r}"; then
+						LDFLAGS="-L${withval}/lib -R${withval}/lib ${LDFLAGS}"
+					else
+						LDFLAGS="-L${withval}/lib ${LDFLAGS}"
+					fi
+				else
+					if test -n "${need_dash_r}"; then
+						LDFLAGS="-L${withval} -R${withval} ${LDFLAGS}"
+					else
+						LDFLAGS="-L${withval} ${LDFLAGS}"
+					fi
+				fi
+				if test -d "${withval}/include"; then
+					CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
+				else
+					CPPFLAGS="-I${withval} ${CPPFLAGS}"
+				fi
+			fi
+			LIBS="-lwrap $LIBS"
+			AC_MSG_CHECKING([for libwrap])
+			AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <tcpd.h>
+int deny_severity = 0, allow_severity = 0;
+				]], [[
+	hosts_access(0);
+				]])], [
+					AC_MSG_RESULT([yes])
+					AC_DEFINE([LIBWRAP], [1],
+						[Define if you want
+						TCP Wrappers support])
+					SSHDLIBS="$SSHDLIBS -lwrap"
+					TCPW_MSG="yes"
+				], [
+					AC_MSG_ERROR([*** libwrap missing])
+				
+			])
+			LIBS="$saved_LIBS"
 		fi
 	]
 )
@@ -5098,6 +5155,7 @@ echo "                 KerberosV support: $KRB5_MSG"
 echo "                   SELinux support: $SELINUX_MSG"
 echo "                 Smartcard support: $SCARD_MSG"
 echo "                     S/KEY support: $SKEY_MSG"
+echo "              TCP Wrappers support: $TCPW_MSG"
 echo "              MD5 password support: $MD5_MSG"
 echo "                   libedit support: $LIBEDIT_MSG"
 echo "  Solaris process contract support: $SPC_MSG"
