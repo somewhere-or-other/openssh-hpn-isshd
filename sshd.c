@@ -1359,9 +1359,10 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			l_tv.tv_sec = 60;
 			l_tv.tv_usec = 0;
 
+			ret = select(maxfd+1, fdset, NULL, NULL, &l_tv);
+			
 			s_audit("sshd_server_heartbeat_3", "count=%i", ret);
 
-			ret = select(maxfd+1, fdset, NULL, NULL, &l_tv);
 #endif
 
 		if (ret < 0 && errno != EINTR)
