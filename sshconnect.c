@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.271 2016/01/14 22:56:56 markus Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.272 2016/09/12 01:22:38 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -15,7 +15,6 @@
 
 #include "includes.h"
 
-#include <sys/param.h>	/* roundup */
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -283,14 +282,13 @@ ssh_set_socket_recvbuf(int sock)
 
 	debug("setsockopt Attempting to set SO_RCVBUF to %d", options.tcp_rcv_buf);
 	if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, buf, sz) >= 0) {
-	  getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &socksize, &socksizelen);
-	  debug("setsockopt SO_RCVBUF: %.100s %d", strerror(errno), socksize);
+		getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &socksize, &socksizelen);
+		debug("setsockopt SO_RCVBUF: %.100s %d", strerror(errno), socksize);
 	}
 	else
 		error("Couldn't set socket receive buffer to %d: %.100s",
 		    options.tcp_rcv_buf, strerror(errno));
 }
-
 
 /*
  * Creates a (possibly privileged) socket for use as the ssh connection.
@@ -1431,7 +1429,7 @@ ssh_put_password(char *password)
 		packet_put_cstring(password);
 		return;
 	}
-	size = roundup(strlen(password) + 1, 32);
+	size = ROUNDUP(strlen(password) + 1, 32);
 	padded = xcalloc(1, size);
 	strlcpy(padded, password, size);
 	packet_put_string(padded, size);
