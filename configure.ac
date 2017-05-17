@@ -1165,6 +1165,7 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM([[ #include <stdio.h> ]], [[ exit(0); ]])],
 dnl Checks for header files.
 # Checks for libraries.
 AC_CHECK_FUNC([setsockopt], , [AC_CHECK_LIB([socket], [setsockopt])])
+AC_CHECK_FUNC([yp_match], , [AC_CHECK_LIB([nsl], [yp_match])])
 
 dnl IRIX and Solaris 2.5.1 have dirname() in libgen
 AC_CHECK_FUNCS([dirname], [AC_CHECK_HEADERS([libgen.h])] , [
@@ -1466,6 +1467,62 @@ AC_ARG_WITH([skey],
 			[
 				AC_MSG_RESULT([no])
 			])
+		fi
+	]
+)
+
+# Check whether user wants TCP wrappers support
+TCPW_MSG="no"
+AC_ARG_WITH([tcp-wrappers],
+	[  --with-tcp-wrappers[[=PATH]] Enable tcpwrappers support (optionally in PATH)],
+	[
+		if test "x$withval" != "xno" ; then
+			saved_LIBS="$LIBS"
+			saved_LDFLAGS="$LDFLAGS"
+			saved_CPPFLAGS="$CPPFLAGS"
+			if test -n "${withval}" && \
+			    test "x${withval}" != "xyes"; then
+				if test -d "${withval}/lib"; then
+					if test -n "${need_dash_r}"; then
+						LDFLAGS="-L${withval}/lib -R${withval}/lib ${LDFLAGS}"
+					else
+						LDFLAGS="-L${withval}/lib ${LDFLAGS}"
+					fi
+				else
+					if test -n "${need_dash_r}"; then
+						LDFLAGS="-L${withval} -R${withval} ${LDFLAGS}"
+					else
+						LDFLAGS="-L${withval} ${LDFLAGS}"
+					fi
+				fi
+				if test -d "${withval}/include"; then
+					CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
+				else
+					CPPFLAGS="-I${withval} ${CPPFLAGS}"
+				fi
+			fi
+			LIBS="-lwrap $LIBS"
+			AC_MSG_CHECKING([for libwrap])
+			AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <tcpd.h>
+int deny_severity = 0, allow_severity = 0;
+				]], [[
+	hosts_access(0);
+				]])], [
+					AC_MSG_RESULT([yes])
+					AC_DEFINE([LIBWRAP], [1],
+						[Define if you want
+						TCP Wrappers support])
+					SSHDLIBS="$SSHDLIBS -lwrap"
+					TCPW_MSG="yes"
+				], [
+					AC_MSG_ERROR([*** libwrap missing])
+				
+			])
+			LIBS="$saved_LIBS"
 		fi
 	]
 )
@@ -4168,6 +4225,69 @@ AC_ARG_WITH([selinux],
 AC_SUBST([SSHLIBS])
 AC_SUBST([SSHDLIBS])
 
+NERSC_MOD='no'
+AC_ARG_WITH(nerscmod,
+	[  --with-nerscmod Add sshd instrumentation],
+	[
+		if test "x$withval" != "xno" ; then
+			NERSC_MOD='yes'
+			AC_DEFINE(NERSC_MOD, 1, [define for NERSC mods])
+			AC_MSG_RESULT(yes)
+
+		fi
+	]
+)
+
+STUNNEL_PORT='799'
+AC_ARG_WITH(stunnelport,
+	[  --with-stunnelport=PORT     Set stunnel port if other than 799/tcp ],
+	[
+
+		case "$withval" in
+		[[0-9]]*)
+			STUNNEL_PORT="$withval"
+			;;
+		*)
+			AC_MSG_ERROR(You must specify a numeric port number for --with-stunnelport)
+			;;
+		esac
+
+		if test ! -z "$withval"  ; then
+			#STUNNEL_PORT="$withval"
+			AC_DEFINE_UNQUOTED(STUNNEL_PORT, $STUNNEL_PORT, [define for NERSC mods])
+		fi
+	]
+)
+
+STUNNEL_HOST='localhost'
+AC_ARG_WITH(stunnelhost,
+	[  --with-stunnelhost=HOST      Set stunnel host if other than localhost.  Do not quote.],
+	[
+
+		STUNNEL_HOST="localhost"
+
+		if test "x$withval" != "xno"  ; then
+			STUNNEL_HOST="\"$withval\""
+			AC_DEFINE_UNQUOTED(STUNNEL_HOST, $STUNNEL_HOST, [define for NERSC mods])
+		fi
+	]
+)
+
+
+PASSWD_REC='no'
+AC_ARG_WITH(passwdrec,
+	[  --with-passwdrec record password data],
+	[
+		if test "x$withval" != "xno" ; then
+			PASSWD_REC='yes'
+			AC_DEFINE(PASSWD_REC, 1, [set to record password info])
+			AC_MSG_RESULT(yes)
+
+		fi
+	]
+)
+
+
 # Check whether user wants Kerberos 5 support
 KRB5_MSG="no"
 AC_ARG_WITH([kerberos5],
@@ -5093,6 +5213,7 @@ echo "                 KerberosV support: $KRB5_MSG"
 echo "                   SELinux support: $SELINUX_MSG"
 echo "                 Smartcard support: $SCARD_MSG"
 echo "                     S/KEY support: $SKEY_MSG"
+echo "              TCP Wrappers support: $TCPW_MSG"
 echo "              MD5 password support: $MD5_MSG"
 echo "                   libedit support: $LIBEDIT_MSG"
 echo "                   libldns support: $LDNS_MSG"
@@ -5103,6 +5224,12 @@ echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
 echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
 echo "                  BSD Auth support: $BSD_AUTH_MSG"
 echo "              Random number source: $RAND_MSG"
+echo "              NERSC Mods          : $NERSC_MOD"
+if test "x$NERSC_MOD" = "xyes" ; then
+echo "              STUNNEL Host        : $STUNNEL_HOST"
+echo "              STUNNEL Port        : $STUNNEL_PORT"
+echo "              Record Passwd Data  : $PASSWD_REC"
+fi
 echo "             Privsep sandbox style: $SANDBOX_STYLE"
 
 echo ""
