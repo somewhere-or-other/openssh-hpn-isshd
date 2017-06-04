@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.60 2016/11/30 02:57:40 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.62 2017/01/30 01:03:00 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -569,9 +569,12 @@ process_principals(FILE *f, char *file, struct passwd *pw,
 {
 	char line[SSH_MAX_PUBKEY_BYTES], *cp, *ep, *line_opts;
 	u_long linenum = 0;
-	u_int i;
+	u_int i, found_principal = 0;
 
 	while (read_keyfile_line(f, file, line, sizeof(line), &linenum) != -1) {
+		/* Always consume entire input */
+		if (found_principal)
+			continue;
 		/* Skip leading whitespace. */
 		for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
 			;
@@ -604,11 +607,12 @@ process_principals(FILE *f, char *file, struct passwd *pw,
 				if (auth_parse_options(pw, line_opts,
 				    file, linenum) != 1)
 					continue;
-				return 1;
+				found_principal = 1;
+				continue;
 			}
 		}
 	}
-	return 0;
+	return found_principal;
 }
 
 static int
@@ -732,6 +736,9 @@ match_principals_command(struct passwd *user_pw, const struct sshkey *key)
 
 	ok = process_principals(f, NULL, pw, cert);
 
+	fclose(f);
+	f = NULL;
+
 	if (exited_cleanly(pid, "AuthorizedPrincipalsCommand", command) != 0)
 		goto out;
 
@@ -773,6 +780,9 @@ check_authkeys_file(FILE *f, char *file, Key* key, struct passwd *pw)
 		char *cp, *key_options = NULL, *fp = NULL;
 		const char *reason = NULL;
 
+		/* Always consume entrire file */
+		if (found_key)
+			continue;
 		if (found != NULL)
 			key_free(found);
 		found = key_new(key_is_cert(key) ? KEY_UNSPEC : key->type);
@@ -871,7 +881,7 @@ check_authkeys_file(FILE *f, char *file, Key* key, struct passwd *pw)
 
 			free(fp);
 			found_key = 1;
-			break;
+			continue;
 		}
 	}
 	if (found != NULL)
@@ -1066,6 +1076,9 @@ user_key_command_allowed2(struct passwd *user_pw, Key *key)
 	temporarily_use_uid(pw);
 
 	ok = check_authkeys_file(f, options.authorized_keys_command, key, pw);
+
+	fclose(f);
+	f = NULL;
 
 	if (exited_cleanly(pid, "AuthorizedKeysCommand", command) != 0)
 		goto out;
