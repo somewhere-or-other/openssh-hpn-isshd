@@ -1,4 +1,4 @@
-#	$OpenBSD: cert-hostkey.sh,v 1.14 2016/05/02 09:52:00 djm Exp $
+#	$OpenBSD: cert-hostkey.sh,v 1.18 2019/07/25 08:28:15 dtucker Exp $
 #	Placed in the Public Domain.
 
 tid="certified host keys"
@@ -7,6 +7,7 @@ rm -f $OBJ/known_hosts-cert* $OBJ/host_ca_key* $OBJ/host_revoked_*
 rm -f $OBJ/cert_host_key* $OBJ/host_krl_*
 
 # Allow all hostkey/pubkey types, prefer certs for the client
+rsa=0
 types=""
 for i in `$SSH -Q key`; do
 	if [ -z "$types" ]; then
@@ -14,6 +15,14 @@ for i in `$SSH -Q key`; do
 		continue
 	fi
 	case "$i" in
+	# Special treatment for RSA keys.
+	*rsa*cert*)
+		types="rsa-sha2-256-cert-v01@openssh.com,$i,$types"
+		types="rsa-sha2-512-cert-v01@openssh.com,$types";;
+	*rsa*)
+		rsa=1
+		types="$types,rsa-sha2-512,rsa-sha2-256,$i";;
+	# Prefer certificate to plain keys.
 	*cert*)	types="$i,$types";;
 	*)	types="$types,$i";;
 	esac
@@ -44,10 +53,12 @@ kh_revoke() {
 }
 
 # Create a CA key and add it to known hosts. Ed25519 chosen for speed.
-# RSA for testing RSA/SHA2 signatures.
+# RSA for testing RSA/SHA2 signatures if supported.
+ktype2=ed25519
+[ "x$rsa" = "x1" ] && ktype2=rsa
 ${SSHKEYGEN} -q -N '' -t ed25519  -f $OBJ/host_ca_key ||\
 	fail "ssh-keygen of host_ca_key failed"
-${SSHKEYGEN} -q -N '' -t rsa  -f $OBJ/host_ca_key2 ||\
+${SSHKEYGEN} -q -N '' -t $ktype2  -f $OBJ/host_ca_key2 ||\
 	fail "ssh-keygen of host_ca_key failed"
 
 kh_ca host_ca_key.pub host_ca_key2.pub > $OBJ/known_hosts-cert.orig
@@ -104,7 +115,7 @@ attempt_connect() {
 	shift; shift
 	verbose "$tid: $_ident expect success $_expect_success"
 	cp $OBJ/known_hosts-cert.orig $OBJ/known_hosts-cert
-	${SSH} -2 -oUserKnownHostsFile=$OBJ/known_hosts-cert \
+	${SSH} -oUserKnownHostsFile=$OBJ/known_hosts-cert \
 	    -oGlobalKnownHostsFile=$OBJ/known_hosts-cert \
 	    "$@" -F $OBJ/ssh_proxy somehost true
 	_r=$?
@@ -120,7 +131,7 @@ attempt_connect() {
 }
 
 # Basic connect and revocation tests.
-for privsep in yes no ; do
+for privsep in yes sandbox ; do
 	for ktype in $PLAIN_TYPES ; do
 		verbose "$tid: host ${ktype} cert connect privsep $privsep"
 		(
@@ -158,7 +169,7 @@ for ktype in $PLAIN_TYPES ; do
 	kh_revoke cert_host_key_${ktype}.pub >> $OBJ/known_hosts-cert.orig
 done
 cp $OBJ/known_hosts-cert.orig $OBJ/known_hosts-cert
-for privsep in yes no ; do
+for privsep in yes sandbox ; do
 	for ktype in $PLAIN_TYPES ; do
 		verbose "$tid: host ${ktype} revoked cert privsep $privsep"
 		(
@@ -169,7 +180,7 @@ for privsep in yes no ; do
 		) > $OBJ/sshd_proxy
 
 		cp $OBJ/known_hosts-cert.orig $OBJ/known_hosts-cert
-		${SSH} -2 -oUserKnownHostsFile=$OBJ/known_hosts-cert \
+		${SSH} -oUserKnownHostsFile=$OBJ/known_hosts-cert \
 		    -oGlobalKnownHostsFile=$OBJ/known_hosts-cert \
 			-F $OBJ/ssh_proxy somehost true >/dev/null 2>&1
 		if [ $? -eq 0 ]; then
@@ -190,7 +201,7 @@ for ktype in $PLAIN_TYPES ; do
 		echo HostCertificate $OBJ/cert_host_key_${ktype}-cert.pub
 	) > $OBJ/sshd_proxy
 	cp $OBJ/known_hosts-cert.orig $OBJ/known_hosts-cert
-	${SSH} -2 -oUserKnownHostsFile=$OBJ/known_hosts-cert \
+	${SSH} -oUserKnownHostsFile=$OBJ/known_hosts-cert \
 	    -oGlobalKnownHostsFile=$OBJ/known_hosts-cert \
 		-F $OBJ/ssh_proxy somehost true >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
@@ -207,7 +218,7 @@ test_one() {
 	result=$2
 	sign_opts=$3
 
-	for kt in rsa ed25519 ; do
+	for kt in $PLAIN_TYPES; do
 		case $ktype in
 		rsa-sha2-*)	tflag="-t $ktype"; ca="$OBJ/host_ca_key2" ;;
 		*)		tflag=""; ca="$OBJ/host_ca_key" ;;
@@ -222,7 +233,7 @@ test_one() {
 		) > $OBJ/sshd_proxy
 
 		cp $OBJ/known_hosts-cert.orig $OBJ/known_hosts-cert
-		${SSH} -2 -oUserKnownHostsFile=$OBJ/known_hosts-cert \
+		${SSH} -oUserKnownHostsFile=$OBJ/known_hosts-cert \
 		    -oGlobalKnownHostsFile=$OBJ/known_hosts-cert \
 		    -F $OBJ/ssh_proxy somehost true >/dev/null 2>&1
 		rc=$?
@@ -271,7 +282,7 @@ for ktype in $PLAIN_TYPES ; do
 		echo HostCertificate $OBJ/cert_host_key_${ktype}-cert.pub
 	) > $OBJ/sshd_proxy
 
-	${SSH} -2 -oUserKnownHostsFile=$OBJ/known_hosts-cert \
+	${SSH} -oUserKnownHostsFile=$OBJ/known_hosts-cert \
 	    -oGlobalKnownHostsFile=$OBJ/known_hosts-cert \
 		-F $OBJ/ssh_proxy somehost true
 	if [ $? -ne 0 ]; then
@@ -303,7 +314,7 @@ for kt in $PLAIN_TYPES ; do
 	) > $OBJ/sshd_proxy
 
 	cp $OBJ/known_hosts-cert.orig $OBJ/known_hosts-cert
-	${SSH} -2 -oUserKnownHostsFile=$OBJ/known_hosts-cert \
+	${SSH} -oUserKnownHostsFile=$OBJ/known_hosts-cert \
 	    -oGlobalKnownHostsFile=$OBJ/known_hosts-cert \
 		-F $OBJ/ssh_proxy -q somehost true >/dev/null 2>&1
 	if [ $? -eq 0 ]; then

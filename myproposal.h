@@ -1,4 +1,4 @@
-/* $OpenBSD: myproposal.h,v 1.54 2016/09/28 16:33:07 djm Exp $ */
+/* $OpenBSD: myproposal.h,v 1.58 2019/02/23 08:20:43 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -90,23 +90,20 @@
 # else
 #  define KEX_CURVE25519_METHODS ""
 # endif
-#define KEX_COMMON_KEX \
+#define KEX_SERVER_KEX \
 	KEX_CURVE25519_METHODS \
 	KEX_ECDH_METHODS \
-	KEX_SHA2_METHODS
-
-#define KEX_SERVER_KEX KEX_COMMON_KEX \
-	KEX_SHA2_GROUP14 \
-	"diffie-hellman-group14-sha1" \
-
-#define KEX_CLIENT_KEX KEX_COMMON_KEX \
-	"diffie-hellman-group-exchange-sha1," \
+	KEX_SHA2_METHODS \
 	KEX_SHA2_GROUP14 \
 	"diffie-hellman-group14-sha1"
+
+#define KEX_CLIENT_KEX KEX_SERVER_KEX
 
 #define	KEX_DEFAULT_PK_ALG	\
 	HOSTKEY_ECDSA_CERT_METHODS \
 	"ssh-ed25519-cert-v01@openssh.com," \
+	"rsa-sha2-512-cert-v01@openssh.com," \
+	"rsa-sha2-256-cert-v01@openssh.com," \
 	"ssh-rsa-cert-v01@openssh.com," \
 	HOSTKEY_ECDSA_METHODS \
 	"ssh-ed25519," \
@@ -121,8 +118,7 @@
 	"aes128-ctr,aes192-ctr,aes256-ctr" \
 	AESGCM_CIPHER_MODES
 
-#define KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT "," \
-	"aes128-cbc,aes192-cbc,aes256-cbc"
+#define KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT
 
 #define KEX_SERVER_MAC \
 	"umac-64-etm@openssh.com," \
@@ -137,6 +133,14 @@
 	"hmac-sha1"
 
 #define KEX_CLIENT_MAC KEX_SERVER_MAC
+
+/* Not a KEX value, but here so all the algorithm defaults are together */
+#define	SSH_ALLOWED_CA_SIGALGS	\
+	HOSTKEY_ECDSA_METHODS \
+	"ssh-ed25519," \
+	"rsa-sha2-512," \
+	"rsa-sha2-256," \
+	"ssh-rsa"
 
 #else /* WITH_OPENSSL */
 
@@ -164,6 +168,8 @@
 #define KEX_CLIENT_KEX KEX_SERVER_KEX
 #define	KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT
 #define KEX_CLIENT_MAC KEX_SERVER_MAC
+
+#define	SSH_ALLOWED_CA_SIGALGS	"ssh-ed25519"
 
 #endif /* WITH_OPENSSL */
 
