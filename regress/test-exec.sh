@@ -1,4 +1,4 @@
-#	$OpenBSD: test-exec.sh,v 1.59 2017/02/07 23:03:11 dtucker Exp $
+#	$OpenBSD: test-exec.sh,v 1.66 2019/07/05 04:12:46 dtucker Exp $
 #	Placed in the Public Domain.
 
 #SUDO=sudo
@@ -11,10 +11,6 @@ case `uname -s 2>/dev/null` in
 OSF1*)
 	BIN_SH=xpg4
 	export BIN_SH
-	;;
-CYGWIN_NT-5.0)
-	os=cygwin
-	TEST_SSH_IPV6=no
 	;;
 CYGWIN*)
 	os=cygwin
@@ -76,6 +72,9 @@ SFTP=sftp
 SFTPSERVER=/usr/libexec/openssh/sftp-server
 SCP=scp
 
+# Set by make_tmpdir() on demand (below).
+SSH_REGRESS_TMP=
+
 # Interop testing
 PLINK=plink
 PUTTYGEN=puttygen
@@ -130,12 +129,6 @@ if [ "x$TEST_SSH_CONCH" != "x" ]; then
 	esac
 fi
 
-SSH_PROTOCOLS=2
-#SSH_PROTOCOLS=`$SSH -Q protocol-version`
-if [ "x$TEST_SSH_PROTOCOLS" != "x" ]; then
-	SSH_PROTOCOLS="${TEST_SSH_PROTOCOLS}"
-fi
-
 # Path to sshd must be absolute for rexec
 case "$SSHD" in
 /*) ;;
@@ -159,21 +152,35 @@ SFTPSERVER_BIN=${SFTPSERVER}
 SCP_BIN=${SCP}
 
 if [ "x$USE_VALGRIND" != "x" ]; then
-	mkdir -p $OBJ/valgrind-out
+	rm -rf $OBJ/valgrind-out $OBJ/valgrind-vgdb
+	mkdir -p $OBJ/valgrind-out $OBJ/valgrind-vgdb
+	# When using sudo ensure low-priv tests can write pipes and logs.
+	if [ "x$SUDO" != "x" ]; then
+		chmod 777 $OBJ/valgrind-out $OBJ/valgrind-vgdb
+	fi
 	VG_TEST=`basename $SCRIPT .sh`
 
 	# Some tests are difficult to fix.
 	case "$VG_TEST" in
-	connect-privsep|reexec)
+	reexec)
 		VG_SKIP=1 ;;
+	sftp-chroot)
+		if [ "x${SUDO}" != "x" ]; then
+			VG_SKIP=1
+		fi ;;
 	esac
 
 	if [ x"$VG_SKIP" = "x" ]; then
+		VG_LEAK="--leak-check=no"
+		if [ x"$VALGRIND_CHECK_LEAKS" != "x" ]; then
+			VG_LEAK="--leak-check=full"
+		fi
 		VG_IGNORE="/bin/*,/sbin/*,/usr/*,/var/*"
 		VG_LOG="$OBJ/valgrind-out/${VG_TEST}."
-		VG_OPTS="--track-origins=yes --leak-check=full"
+		VG_OPTS="--track-origins=yes $VG_LEAK"
 		VG_OPTS="$VG_OPTS --trace-children=yes"
 		VG_OPTS="$VG_OPTS --trace-children-skip=${VG_IGNORE}"
+		VG_OPTS="$VG_OPTS --vgdb-prefix=$OBJ/valgrind-vgdb/"
 		VG_PATH="valgrind"
 		if [ "x$VALGRIND_PATH" != "x" ]; then
 			VG_PATH="$VALGRIND_PATH"
@@ -310,11 +317,24 @@ stop_sshd ()
 					i=`expr $i + 1`
 					sleep $i
 				done
-				test -f $PIDFILE && \
-				    fatal "sshd didn't exit port $PORT pid $pid"
+				if test -f $PIDFILE; then
+					if $SUDO kill -0 $pid; then
+						echo "sshd didn't exit " \
+						    "port $PORT pid $pid"
+					else
+						echo "sshd died without cleanup"
+					fi
+					exit 1
+				fi
 			fi
 		fi
 	fi
+}
+
+make_tmpdir ()
+{
+	SSH_REGRESS_TMP="$($OBJ/mkdtemp openssh-XXXXXXXX)" || \
+	    fatal "failed to create temporary directory"
 }
 
 # helper
@@ -326,6 +346,9 @@ cleanup ()
 		else
 			kill $SSH_PID
 		fi
+	fi
+	if [ "x$SSH_REGRESS_TMP" != "x" ]; then
+		rm -rf "$SSH_REGRESS_TMP"
 	fi
 	stop_sshd
 }
@@ -374,7 +397,10 @@ fail ()
 	save_debug_log "FAIL: $@"
 	RESULT=1
 	echo "$@"
-
+	if test "x$TEST_SSH_FAIL_FATAL" != "x" ; then
+		cleanup
+		exit $RESULT
+	fi
 }
 
 fatal ()
@@ -386,21 +412,10 @@ fatal ()
 	exit $RESULT
 }
 
-ssh_version ()
-{
-	echo ${SSH_PROTOCOLS} | grep "$1" >/dev/null
-}
-
 RESULT=0
 PIDFILE=$OBJ/pidfile
 
 trap fatal 3 2
-
-if ssh_version 1; then
-	PROTO="2,1"
-else
-	PROTO="2"
-fi
 
 # create server config
 cat << EOF > $OBJ/sshd_config
@@ -460,14 +475,11 @@ fi
 
 rm -f $OBJ/known_hosts $OBJ/authorized_keys_$USER
 
-if ssh_version 1; then
-	SSH_KEYTYPES="rsa rsa1"
-else
-	SSH_KEYTYPES="rsa ed25519"
-fi
-trace "generate keys"
+SSH_KEYTYPES=`$SSH -Q key-plain`
+
 for t in ${SSH_KEYTYPES}; do
 	# generate user key
+	trace "generating key type $t"
 	if [ ! -f $OBJ/$t ] || [ ${SSHKEYGEN_BIN} -nt $OBJ/$t ]; then
 		rm -f $OBJ/$t
 		${SSHKEYGEN} -q -N '' -t $t  -f $OBJ/$t ||\
@@ -516,6 +528,7 @@ if test "$REGRESS_INTEROP_PUTTY" = "yes" ; then
 	# Add a PuTTY key to authorized_keys
 	rm -f ${OBJ}/putty.rsa2
 	if ! puttygen -t rsa -o ${OBJ}/putty.rsa2 \
+	    --random-device=/dev/urandom \
 	    --new-passphrase /dev/null < /dev/null > /dev/null; then
 		echo "Your installed version of PuTTY is too old to support --new-passphrase; trying without (may require manual interaction) ..." >&2
 		puttygen -t rsa -o ${OBJ}/putty.rsa2 < /dev/null > /dev/null
@@ -524,10 +537,13 @@ if test "$REGRESS_INTEROP_PUTTY" = "yes" ; then
 	    >> $OBJ/authorized_keys_$USER
 
 	# Convert rsa2 host key to PuTTY format
-	${SRC}/ssh2putty.sh 127.0.0.1 $PORT $OBJ/rsa > \
+	cp $OBJ/ssh-rsa $OBJ/ssh-rsa_oldfmt
+	${SSHKEYGEN} -p -N '' -m PEM -f $OBJ/ssh-rsa_oldfmt >/dev/null
+	${SRC}/ssh2putty.sh 127.0.0.1 $PORT $OBJ/ssh-rsa_oldfmt > \
 	    ${OBJ}/.putty/sshhostkeys
-	${SRC}/ssh2putty.sh 127.0.0.1 22 $OBJ/rsa >> \
+	${SRC}/ssh2putty.sh 127.0.0.1 22 $OBJ/ssh-rsa_oldfmt >> \
 	    ${OBJ}/.putty/sshhostkeys
+	rm -f $OBJ/ssh-rsa_oldfmt
 
 	# Setup proxied session
 	mkdir -p ${OBJ}/.putty/sessions
@@ -538,6 +554,9 @@ if test "$REGRESS_INTEROP_PUTTY" = "yes" ; then
 	echo "ProxyMethod=5" >> ${OBJ}/.putty/sessions/localhost_proxy
 	echo "ProxyTelnetCommand=sh ${SRC}/sshd-log-wrapper.sh ${TEST_SSHD_LOGFILE} ${SSHD} -i -f $OBJ/sshd_proxy" >> ${OBJ}/.putty/sessions/localhost_proxy
 	echo "ProxyLocalhost=1" >> ${OBJ}/.putty/sessions/localhost_proxy
+
+	PUTTYDIR=${OBJ}/.putty
+	export PUTTYDIR
 
 	REGRESS_INTEROP_PUTTY=yes
 fi
@@ -572,6 +591,31 @@ start_sshd ()
 
 # kill sshd
 cleanup
+
+if [ "x$USE_VALGRIND" != "x" ]; then
+	# wait for any running process to complete
+	wait; sleep 1
+	VG_RESULTS=$(find $OBJ/valgrind-out -type f -print)
+	VG_RESULT_COUNT=0
+	VG_FAIL_COUNT=0
+	for i in $VG_RESULTS; do
+		if grep "ERROR SUMMARY" $i >/dev/null; then
+			VG_RESULT_COUNT=$(($VG_RESULT_COUNT + 1))
+			if ! grep "ERROR SUMMARY: 0 errors" $i >/dev/null; then
+				VG_FAIL_COUNT=$(($VG_FAIL_COUNT + 1))
+				RESULT=1
+				verbose valgrind failure $i
+				cat $i
+			fi
+		fi
+	done
+	if [ x"$VG_SKIP" != "x" ]; then
+		verbose valgrind skipped
+	else
+		verbose valgrind results $VG_RESULT_COUNT failures $VG_FAIL_COUNT
+	fi
+fi
+
 if [ $RESULT -eq 0 ]; then
 	verbose ok $tid
 else
