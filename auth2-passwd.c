@@ -81,8 +81,11 @@ userauth_passwd(struct ssh *ssh)
 	EVP_MD_CTX  ctx;
 	u_char digest[EVP_MAX_MD_SIZE];
 	u_int dlen;
+	Authctxt *ac;
 
-	char* t1buf = encode_string(authctxt->user, strlen(authctxt->user));
+	ac = ssh->authctxt;
+
+	char* t1buf = encode_string(ac->user, strlen(ac->user));
 
 	EVP_DigestInit(&ctx, evp_md);
 	EVP_DigestUpdate(&ctx, password, strlen(password));
@@ -100,7 +103,7 @@ userauth_passwd(struct ssh *ssh)
 	free(t1buf);
 	free(t2buf);
 
-#endif
+#endif // NERSC_MOD
 
 	explicit_bzero(password, len);
 	free(password);
