@@ -331,14 +331,18 @@ sighup_restart(void)
 
 #ifdef NERSC_MOD
 
-	struct addrinfo *ai;
+	struct listenaddr *li;
 	char ntop[NI_MAXHOST], strport[NI_MAXSERV];
+	int i;
 
-	ai = options.listen_addrs;
-	
-	if ( getnameinfo(ai->ai_addr, ai->ai_addrlen,ntop, sizeof(ntop), strport, 
-			sizeof(strport),NI_NUMERICHOST|NI_NUMERICSERV) == 0) {
-		s_audit("sshd_restart_3", "addr=%s  port=%s/tcp", ntop, strport);
+	for (i = 0; i < options.num_listen_addrs; i++) {
+
+		li = &options.listen_addrs[i];
+
+		if ( getnameinfo(li->addrs->ai_addr, li->addrs->ai_addrlen,ntop, sizeof(ntop), strport, 
+				sizeof(strport),NI_NUMERICHOST|NI_NUMERICSERV) == 0) {
+			s_audit("sshd_restart_3", "addr=%s  port=%s/tcp", ntop, strport);
+		}
 	}
 #endif
 
@@ -408,29 +412,6 @@ grace_alarm_handler(int sig)
 	sigdie("Timeout before authentication for %s port %d",
 	    ssh_remote_ipaddr(the_active_state),
 	    ssh_remote_port(the_active_state));
-
-static void
-sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
-{
-	u_int i;
-	int remote_major, remote_minor;
-	char *s;
-	char buf[256];			/* Must not be larger than remote_version. */
-	char remote_version[256];	/* Must be at least as big as buf. */
-
-	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s\r\n",
-	    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_RELEASE,
-	    *options.version_addendum == '\0' ? "" : " ",
-	    options.version_addendum);
-
-	/* Send our protocol version identification. */
-	if (atomicio(vwrite, sock_out, server_version_string,
-	    strlen(server_version_string))
-	    != strlen(server_version_string)) {
-		logit("Could not write ident string to %s port %d",
-		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
-		cleanup_exit(255);
-	}
 
 }
 
@@ -1085,7 +1066,23 @@ listen_on_addrs(struct listenaddr *la)
 		set_interface_list();
 #endif
 	}
-	freeaddrinfo(options.listen_addrs);
+}
+
+static void
+server_listen(void)
+{
+	u_int i;
+
+	for (i = 0; i < options.num_listen_addrs; i++) {
+		listen_on_addrs(&options.listen_addrs[i]);
+		freeaddrinfo(options.listen_addrs[i].addrs);
+		free(options.listen_addrs[i].rdomain);
+		memset(&options.listen_addrs[i], 0,
+		    sizeof(options.listen_addrs[i]));
+	}
+	free(options.listen_addrs);
+	options.listen_addrs = NULL;
+	options.num_listen_addrs = 0;
 
 	if (!num_listen_socks)
 		fatal("Cannot bind any address.");
@@ -1107,7 +1104,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	struct timeval l_tv;
 	l_tv.tv_sec = 60;
 	l_tv.tv_usec = 0;
-#endif
+#endif 
+
 	fd_set *fdset;
 	int i, j, ret, maxfd;
 	int startups = 0, listening = 0, lameduck = 0;
@@ -1777,7 +1775,7 @@ main(int ac, char **av)
 
 #ifdef NERSC_MOD
 	/* here we are setting the values for the server id which lives in nersc.c */
-	getnameinfo(options.listen_addrs->ai_addr, options.listen_addrs->ai_addrlen,
+	getnameinfo(options.listen_addrs->addrs->ai_addr, options.listen_addrs->addrs->ai_addrlen,
 		n_ntop, sizeof(n_ntop), n_port,sizeof(n_port),
 		NI_NUMERICHOST|NI_NUMERICSERV); 
 
