@@ -184,8 +184,8 @@ struct Channel {
 	int     		mux_downstream_id;
 
 #ifdef NERSC_MOD
-	Buffer  rx_line_buf;
-	Buffer  tx_line_buf;
+	struct sshbuf *rx_line_buf;
+	struct sshbuf *tx_line_buf;
 	int     audit_enable;
 
 	int     max_tx_lines;
