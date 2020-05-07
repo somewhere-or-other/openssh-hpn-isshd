@@ -661,6 +661,18 @@ check_authkey_line(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	    (unsigned long long)key->cert->serial,
 	    sshkey_type(found), fp, loc);
 
+#ifdef NERSC_MOD
+	char* t1key = encode_string(fp, strlen(fp));
+	char* t2key = encode_string(sshkey_type(found), strlen(sshkey_type(found)) );
+
+	s_audit("auth_key_fingerprint_3", "count=%i uristring=%s uristring=%s",
+		client_session_id, t1key, t2key);
+
+	free(t1key);
+	free(t2key);
+#endif
+
+
  success:
 	if (finalopts == NULL)
 		fatal("%s: internal error: missing options", __func__);
@@ -714,20 +726,6 @@ check_authkeys_file(struct ssh *ssh, struct passwd *pw, FILE *f,
 		snprintf(loc, sizeof(loc), "%.200s:%lu", file, linenum);
 		if (check_authkey_line(ssh, pw, key, cp, loc, authoptsp) == 0)
 			found_key = 1;
-
-#ifdef NERSC_MOD
-		if ( found+key == 1 ) {
-			char* t1key = encode_string(fp, strlen(fp));
-			char* t2key = encode_string(key_type(found), strlen(key_type(found)) );
-
-			s_audit("auth_key_fingerprint_3", "count=%i uristring=%s uristring=%s",
-				client_session_id, t1key, t2key);
-
-			free(t1key);
-			free(t2key);
-		}
-#endif
-
 	}
 	free(line);
 	return found_key;
