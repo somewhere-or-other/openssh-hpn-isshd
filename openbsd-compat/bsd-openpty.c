@@ -121,6 +121,15 @@ openpty(int *amaster, int *aslave, char *name, struct termios *termp,
 		return (-1);
 	}
 
+# if defined(I_FIND) && defined(__SVR4)
+	/*
+	 * If the streams modules have already been pushed then there
+	 * is no more work to do here.
+	 */
+	if (ioctl(*aslave, I_FIND, "ptem") != 0)
+		return 0;
+# endif
+
 	/*
 	 * Try to push the appropriate streams modules, as described
 	 * in Solaris pts(7).
@@ -146,31 +155,6 @@ openpty(int *amaster, int *aslave, char *name, struct termios *termp,
 		return (-1);
 	}
 	return (0);
-
-#elif defined(_UNICOS)
-	char ptbuf[64], ttbuf[64];
-	int i;
-	int highpty;
-
-	highpty = 128;
-#ifdef _SC_CRAY_NPTY
-	if ((highpty = sysconf(_SC_CRAY_NPTY)) == -1)
-		highpty = 128;
-#endif /* _SC_CRAY_NPTY */
-
-	for (i = 0; i < highpty; i++) {
-		snprintf(ptbuf, sizeof(ptbuf), "/dev/pty/%03d", i);
-		snprintf(ttbuf, sizeof(ttbuf), "/dev/ttyp%03d", i);
-		if ((*amaster = open(ptbuf, O_RDWR|O_NOCTTY)) == -1)
-			continue;
-		/* Open the slave side. */
-		if ((*aslave = open(ttbuf, O_RDWR|O_NOCTTY)) == -1) {
-			close(*amaster);
-			return (-1);
-		}
-		return (0);
-	}
-	return (-1);
 
 #else
 	/* BSD-style pty code. */
