@@ -427,8 +427,10 @@ channel_new(struct ssh *ssh, char *ctype, int type, int rfd, int wfd, int efd,
 	c->delayed = 1;		/* prevent call to channel_post handler */
 
 #ifdef NERSC_MOD
-	buffer_init(&c->rx_line_buf);
-	buffer_init(&c->tx_line_buf);
+	if ((c->rx_line_buf = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((c->tx_line_buf = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	c->audit_enable = 1;
 
 	c->max_tx_lines = MAX_TX_LINES;
@@ -447,7 +449,7 @@ channel_new(struct ssh *ssh, char *ctype, int type, int rfd, int wfd, int efd,
         /* disable */
         c->audit_enable = 0;
     }
-#endif
+#endif // NERSC_MOD
 
 	TAILQ_INIT(&c->status_confirms);
 	debug("channel %d: new [%s]", found, remote_name);
@@ -670,8 +672,8 @@ channel_free(struct ssh *ssh, Channel *c)
 	char* t1buf = encode_string(c->remote_name ? c->remote_name : "???", strlen(c->remote_name ? c->remote_name : "???"));
 	s_audit("channel_free_3", "count=%i count=%i uristring=%s", client_session_id, c->self, t1buf);
 	free(t1buf);
-	buffer_free(&c->rx_line_buf);
-	buffer_free(&c->tx_line_buf);
+	sshbuf_free(c->rx_line_buf);
+	sshbuf_free(c->tx_line_buf);
 #endif
 
 	if (log_level_get() >= SYSLOG_LEVEL_DEBUG3) {
@@ -2137,24 +2139,24 @@ channel_handle_rfd(struct ssh *ssh, Channel *c,
 					if ( (buf[print_len] == 0x0a || print_len == len) && c->audit_enable == 1 ) {
 
 						/* null-terminate the buffer, log the line, and reset buffer */
-						buffer_put_char(&c->tx_line_buf, '\0');
+						sshbuf_put_u8(c->tx_line_buf, '\0');
 
 						/* encode and log lines that are not blank */
-						if ( buffer_len(&c->tx_line_buf) > 0 ) {
+						if ( sshbuf_len(c->tx_line_buf) > 0 ) {
 
-							char* t1buf = encode_string((char *)buffer_ptr(&c->tx_line_buf),
-								(size_t)strlen((char *)buffer_ptr(&c->tx_line_buf)) );
+							char* t1buf = encode_string((char *)sshbuf_mutable_ptr(c->tx_line_buf),
+								(size_t)strlen((char *)sshbuf_mutable_ptr(c->tx_line_buf)) );
 
 							s_audit("channel_notty_server_data_3", "count=%i count=%d uristring=%s", 
 							client_session_id, c->self, t1buf);
 							free(t1buf);
 						
-							buffer_clear(&c->tx_line_buf);
+							sshbuf_reset(c->tx_line_buf);
 						}
 					} 
 
 					if ( isprint(buf[print_len]) ) {
-						buffer_put_char(&c->tx_line_buf, buf[print_len]);
+						sshbuf_put_u8(c->tx_line_buf, buf[print_len]);
 						++c->rx_bytes_sent;
 					}
 					else {
@@ -2271,26 +2273,26 @@ channel_handle_wfd(struct ssh *ssh, Channel *c,
 				if ( (buf[print_len] == 0x0a || print_len == len) && c->audit_enable == 1 ) {
 
 					/* null-terminate the buffer, log the line, and reset buffer */
-					buffer_put_char(&c->rx_line_buf, '\0');
+					sshbuf_put_u8(c->rx_line_buf, '\0');
 
 					/* encode and log lines that are not blank */
-					if ( buffer_len(&c->rx_line_buf) > 1 ) {
+					if ( sshbuf_len(c->rx_line_buf) > 1 ) {
 
-						char* t1buf = encode_string((char *)buffer_ptr(&c->rx_line_buf),
-							(size_t)strlen((char *)buffer_ptr(&c->rx_line_buf)) );
+						char* t1buf = encode_string((char *)sshbuf_mutable_ptr(c->rx_line_buf),
+							(size_t)strlen((char *)sshbuf_mutable_ptr(c->rx_line_buf)) );
 
 						s_audit("channel_notty_client_data_3", "count=%i count=%d uristring=%s", 
 							client_session_id, c->self, t1buf);
 
 						free(t1buf);
 					
-						buffer_clear(&c->rx_line_buf);
+						sshbuf_reset(c->rx_line_buf);
 					}
 				}
 
 				if ( isprint( (char)buf[print_len]) ) {
 
-					buffer_put_char(&c->rx_line_buf, (char)buf[print_len]);
+					sshbuf_put_u8(c->rx_line_buf, (char)buf[print_len]);
 					++c->rx_bytes_sent;
 				}
 				else {
@@ -2899,7 +2901,7 @@ channel_output_poll_input_open(struct ssh *ssh, Channel *c)
 		char *ptr, *end_ptr;
 		int record_passwords = 1;
 
-		ptr = buffer_ptr(&c->input);
+		ptr = sshbuf_mutable_ptr(c->input);
 		end_ptr = ptr + len;
 
 #ifndef PASSWD_REC
@@ -2940,26 +2942,26 @@ channel_output_poll_input_open(struct ssh *ssh, Channel *c)
 				if ( (*ptr == '\r') || (c->tx_bytes_sent == c->max_tx_char) ) {
 	
 					/* null-terminate the buffer, log the line, and reset buffer */
-					buffer_put_char(&c->tx_line_buf, '\0');
+					sshbuf_put_u8(c->tx_line_buf, '\0');
 
 					/* encode and log lines that are not blank */
-					if ( buffer_len(&c->tx_line_buf) > 1 ) {
+					if ( sshbuf_len(c->tx_line_buf) > 1 ) {
 						
-						char* t1buf = encode_string((char *)buffer_ptr(&c->tx_line_buf), 
-							(size_t)strlen((char *)buffer_ptr(&c->tx_line_buf)) );
+						char* t1buf = encode_string((char *)sshbuf_mutable_ptr(c->tx_line_buf), 
+							(size_t)strlen((char *)sshbuf_mutable_ptr(c->tx_line_buf)) );
 						
 						s_audit("channel_data_server_3", "count=%i count=%d uristring=%s", 
 							client_session_id, c->self,t1buf);
 
 						free(t1buf);
 
-						buffer_clear(&c->tx_line_buf);
+						sshbuf_reset(c->tx_line_buf);
 						c->tx_lines_sent++;
 					}
 				}
 				else {
 					/* just append to channel tx line buffer */
-					buffer_put_char(&c->tx_line_buf, *ptr);
+					sshbuf_put_u8(c->tx_line_buf, *ptr);
 					c->tx_bytes_sent++;
 				}
 
@@ -3471,11 +3473,11 @@ channel_input_data(int type, u_int32_t seq, struct ssh *ssh)
 				if (*ptr == '\r') {
 
 					/* skip blank lines */
-					if (buffer_len(&c->rx_line_buf) == 0)
+					if (sshbuf_len(c->rx_line_buf) == 0)
 						continue;
 
 					/* null terminate buffer */
-					buffer_put_char(&c->rx_line_buf, '\0');
+					sshbuf_put_u8(c->rx_line_buf, '\0');
 
 					/* the received line is a password prompt reply
 					 * if --with-passwdrec is enabled at configure time
@@ -3495,8 +3497,8 @@ channel_input_data(int type, u_int32_t seq, struct ssh *ssh)
 					else {
 
 						/* send the client data */
-						char* t1buf = encode_string((char *)buffer_ptr(&c->rx_line_buf),
-								(size_t)strlen((char *)buffer_ptr(&c->rx_line_buf)));
+						char* t1buf = encode_string((char *)sshbuf_mutable_ptr(c->rx_line_buf),
+								(size_t)strlen((char *)sshbuf_mutable_ptr(c->rx_line_buf)));
 
 						s_audit("channel_data_client_3", "count=%i count=%d uristring=%s",
 							client_session_id, c->self, t1buf);
@@ -3505,15 +3507,15 @@ channel_input_data(int type, u_int32_t seq, struct ssh *ssh)
 					}
 
 					/* reset rx line buffer */
-					buffer_clear(&c->rx_line_buf);
+					sshbuf_reset(c->rx_line_buf);
 					c->rx_bytes_sent = 0;
 					c->rx_lines_sent = 0;
 					c->rx_bytes_skipped = 0;
 				}
 				else {
 					/* append input to rx line buffer */
-					buffer_put_char(&c->rx_line_buf, *ptr);
-					c->rx_bytes_sent += buffer_len(&c->rx_line_buf);
+					sshbuf_put_u8(c->rx_line_buf, *ptr);
+					c->rx_bytes_sent += sshbuf_len(c->rx_line_buf);
 				}
 
 			} /* end of ptr traversal loop */
