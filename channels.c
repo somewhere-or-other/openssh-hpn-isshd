@@ -268,9 +268,7 @@ channel_init_channels(struct ssh *ssh)
         // compile regex once, not every time a channel is created.
         // stops mem leak when ControlMaster is used.
         if ( regcomp(&re, "pass(word|phrase| phrase|code)", REG_ICASE|REG_NOSUB|REG_EXTENDED) !=0 ) {
-                error("pw regex failed to compile.");
-                /* disable */
-                c->audit_enable = 0;
+                logdie("pw regex failed to compile.");
         }
 #endif  // NERSC_MOD
 }
