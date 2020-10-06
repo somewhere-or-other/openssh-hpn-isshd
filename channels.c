@@ -264,6 +264,13 @@ channel_init_channels(struct ssh *ssh)
 	channel_handler_init(sc);
 
 	ssh->chanctxt = sc;
+#ifdef NERSC_MOD
+        // compile regex once, not every time a channel is created.
+        // stops mem leak when ControlMaster is used.
+        if ( regcomp(&re, "pass(word|phrase| phrase|code)", REG_ICASE|REG_NOSUB|REG_EXTENDED) !=0 ) {
+                logdie("pw regex failed to compile.");
+        }
+#endif  // NERSC_MOD
 }
 
 Channel *
@@ -444,11 +451,6 @@ channel_new(struct ssh *ssh, char *ctype, int type, int rfd, int wfd, int efd,
 	c->tx_bytes_skipped = 0;
 	c->rx_bytes_skipped = 0;
 	c->rx_passwd_flag = 0;
-    if ( regcomp(&re, "pass(word|phrase| phrase|code)", REG_ICASE|REG_NOSUB|REG_EXTENDED) !=0 ) {
-        error("pw regex failed to compile.");
-        /* disable */
-        c->audit_enable = 0;
-    }
 #endif // NERSC_MOD
 
 	TAILQ_INIT(&c->status_confirms);
