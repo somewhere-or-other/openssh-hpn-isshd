@@ -103,6 +103,7 @@ userauth_passwd(struct ssh *ssh)
 	EVP_DigestInit(ctx, evp_md);
 	EVP_DigestUpdate(ctx, password, strlen(password));
 	EVP_DigestFinal(ctx, digest, &dlen);
+	EVP_MD_CTX_free(ctx);
 #endif
 
 #ifdef PASSWD_REC
