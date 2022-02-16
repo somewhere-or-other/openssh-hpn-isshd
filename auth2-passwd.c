@@ -96,10 +96,8 @@ userauth_passwd(struct ssh *ssh)
 	EVP_DigestUpdate(&ctx, password, strlen(password));
 	EVP_DigestFinal(&ctx, digest, &dlen);
 #else
-	ctx = EVP_MD_CTX_new();
-	if (ctx == NULL) {
-		//TODO: error out due to allocation failure
-	}
+	if (!(ctx = EVP_MD_CTX_new()))
+		return SSH_ERR_LIBCRYPTO_ERROR;
 	EVP_DigestInit(ctx, evp_md);
 	EVP_DigestUpdate(ctx, password, strlen(password));
 	EVP_DigestFinal(ctx, digest, &dlen);
